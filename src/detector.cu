@@ -20,7 +20,8 @@ DetectorLayout default_detector_layout() {
     DetectorLayout layout;
 
     // Source position: on the right temporal scalp surface
-    layout.src_x = 47.5f;
+    // Placed near T4 (10-20 system), will be projected onto scalp ellipsoid
+    layout.src_x = 75.0f;
     layout.src_y =  5.0f;
     layout.src_z = -10.0f;
 

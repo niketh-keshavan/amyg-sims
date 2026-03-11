@@ -5,9 +5,10 @@
 // ---------------------------------------------------------------------------
 // Layered spherical head model
 // ---------------------------------------------------------------------------
-// Builds a voxelised head model with concentric ellipsoidal shells for
-// scalp, skull, CSF, gray matter, white matter, plus a pair of embedded
-// amygdala volumes (left & right).
+// Builds a voxelised head model with concentric ellipsoidal shells
+// (realistic adult head proportions: ~156 ML x 190 AP x 170 SI mm)
+// for scalp, skull, CSF, gray matter, white matter, plus a pair of
+// embedded amygdala volumes (left & right).
 //
 // Returns: tissue label volume (nx * ny * nz) as a flat vector.
 // ---------------------------------------------------------------------------

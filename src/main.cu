@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
     printf("=============================================================\n");
     printf("  fNIRS Monte Carlo - TD/FD Amygdala Oxygenation\n");
     printf("  Wavelengths: 760 nm & 850 nm | 100 mW pulsed laser\n");
-    printf("  0.1 mm voxels | Photon path recording\n");
+    printf("  0.5 mm voxels | Ellipsoidal head model | Photon path recording\n");
     printf("  High-density array | TPSF + Time-gated outputs\n");
     printf("=============================================================\n\n");
 
@@ -139,8 +139,8 @@ int main(int argc, char** argv) {
     printf("Configuration:\n");
     printf("  Photons per wavelength: %llu\n", (unsigned long long)num_photons);
     printf("  Output directory: %s\n", output_dir.c_str());
-    printf("  Laser power: 100 mW (pulsed, eye/skin-safe)\n");
-    printf("  Voxel size: 0.1 mm\n");
+    printf("  Laser power: 100 mW (pulsed, ANSI Z136.1 compliant)\n");
+    printf("  Voxel size: %.1f mm\n", hm.dx);
     printf("  TPSF bins: %d x %.0f ps = %.1f ns\n\n",
            TPSF_BINS, (double)TPSF_BIN_PS,
            TPSF_BINS * (double)TPSF_BIN_PS / 1000.0);

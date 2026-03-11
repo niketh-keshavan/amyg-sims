@@ -139,13 +139,13 @@ def plot_tissue_slices(vol, meta, output_dir):
     nz, ny, nx = vol.shape
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    z_amyg = nz // 2 - int(15.0 / dx)
+    z_amyg = nz // 2 - int(18.0 / dx)
     im = axes[0].imshow(vol[z_amyg], cmap=TISSUE_CMAP, vmin=0, vmax=6,
                         extent=[0, nx*dx, ny*dx, 0], interpolation="nearest")
     axes[0].set_title(f"Axial  z = {z_amyg * dx:.0f} mm (amygdala level)")
     axes[0].set_xlabel("X [mm]"); axes[0].set_ylabel("Y [mm]")
 
-    y_amyg = ny // 2 + int(5.0 / dx)
+    y_amyg = ny // 2 - int(2.0 / dx)
     axes[1].imshow(vol[:, y_amyg, :], cmap=TISSUE_CMAP, vmin=0, vmax=6,
                    extent=[0, nx*dx, nz*dx, 0], interpolation="nearest")
     axes[1].set_title(f"Coronal  y = {y_amyg * dx:.0f} mm")
@@ -175,7 +175,7 @@ def plot_fluence(vol, fluence, meta, output_dir):
     for wl_key, flu in fluence.items():
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         x_amyg = nx // 2 + int(24.0 / dx)
-        z_amyg = nz // 2 - int(15.0 / dx)
+        z_amyg = nz // 2 - int(18.0 / dx)
 
         slices = [
             (vol[:, :, x_amyg], flu[:, :, x_amyg],
@@ -661,33 +661,35 @@ def _ellipsoid_boundary(cx, cy, a, b, n=100):
 
 
 def _tissue_at_point(x, y, z, meta):
-    """Approximate tissue type from ellipsoidal head model (mm coords from center)."""
+    """Approximate tissue type from ellipsoidal head model (mm coords from center).
+    Semi-axes must match geometry.cu default_head_model()."""
     cx = meta["nx"] * meta["dx"] / 2
     cy = meta["ny"] * meta["dx"] / 2
     cz = meta["nz"] * meta["dx"] / 2
-    rx, ry, rz = (x - cx) / 48, (y - cy) / 48, (z - cz) / 48
+    # Ellipsoidal scalp: (78, 95, 85) mm semi-axes
+    rx, ry, rz = (x - cx) / 78, (y - cy) / 95, (z - cz) / 85
     r = np.sqrt(rx**2 + ry**2 + rz**2)
     if r > 1.0:
         return 0  # air
     # Check amygdala (right)
-    ax, ay, az = (x - cx - 24) / 5, (y - cy - 5) / 9, (z - cz + 15) / 6
+    ax, ay, az = (x - cx - 24) / 5, (y - cy + 2) / 9, (z - cz + 18) / 6
     if ax**2 + ay**2 + az**2 <= 1.0:
         return 6
     # Check amygdala (left)
     ax2 = (x - cx + 24) / 5
     if ax2**2 + ay**2 + az**2 <= 1.0:
         return 6
-    r44 = np.sqrt(((x-cx)/44)**2 + ((y-cy)/44)**2 + ((z-cz)/44)**2)
-    if r44 > 1.0:
+    r_sk = np.sqrt(((x-cx)/74)**2 + ((y-cy)/91)**2 + ((z-cz)/81)**2)
+    if r_sk > 1.0:
         return 1  # scalp
-    r38 = np.sqrt(((x-cx)/38)**2 + ((y-cy)/38)**2 + ((z-cz)/38)**2)
-    if r38 > 1.0:
+    r_csf = np.sqrt(((x-cx)/67)**2 + ((y-cy)/84)**2 + ((z-cz)/74)**2)
+    if r_csf > 1.0:
         return 2  # skull
-    r365 = np.sqrt(((x-cx)/36.5)**2 + ((y-cy)/36.5)**2 + ((z-cz)/36.5)**2)
-    if r365 > 1.0:
+    r_gm = np.sqrt(((x-cx)/65.5)**2 + ((y-cy)/82.5)**2 + ((z-cz)/72.5)**2)
+    if r_gm > 1.0:
         return 3  # CSF
-    r33 = np.sqrt(((x-cx)/33)**2 + ((y-cy)/33)**2 + ((z-cz)/33)**2)
-    if r33 > 1.0:
+    r_wm = np.sqrt(((x-cx)/62)**2 + ((y-cy)/79)**2 + ((z-cz)/69)**2)
+    if r_wm > 1.0:
         return 4  # gray matter
     return 5  # white matter
 
@@ -713,17 +715,17 @@ def plot_photon_paths(paths, results, meta, output_dir):
 
         # --- Left: Sagittal view (X=const through R amygdala) ---
         ax = axes[0]
-        # Draw tissue boundaries (sagittal = Y-Z plane at x=cx+24)
-        for radius, color, label in [
-            (48, "#D2B48C", "Scalp"), (44, "#DEB887", "Skull"),
-            (38, "#87CEEB", "CSF"), (36.5, "#CD5C5C", "Gray"),
-            (33, "#F5F5DC", "White")
+        # Draw tissue boundaries (sagittal = Y-Z plane); semi-axes: (Y, Z)
+        for (sa_y, sa_z), color, label in [
+            ((95, 85), "#D2B48C", "Scalp"), ((91, 81), "#DEB887", "Skull"),
+            ((84, 74), "#87CEEB", "CSF"), ((82.5, 72.5), "#CD5C5C", "Gray"),
+            ((79, 69), "#F5F5DC", "White")
         ]:
-            ey, ez = _ellipsoid_boundary(cy, cz, radius, radius)
+            ey, ez = _ellipsoid_boundary(cy, cz, sa_y, sa_z)
             ax.plot(ey, ez, color=color, linewidth=1.0, alpha=0.5)
 
-        # Right amygdala ellipse in sagittal view
-        ay, az = _ellipsoid_boundary(cy + 5, cz - 15, 9, 6)
+        # Right amygdala ellipse in sagittal view (center: cy-2, cz-18)
+        ay, az = _ellipsoid_boundary(cy - 2, cz - 18, 9, 6)
         ax.fill(ay, az, color=TISSUE_COLORS[6], alpha=0.3, label="Amygdala")
         ax.plot(ay, az, color="red", linewidth=1.5)
 
@@ -739,8 +741,8 @@ def plot_photon_paths(paths, results, meta, output_dir):
             # Color by whether path passed near amygdala
             # Check if any point is inside R amygdala ellipsoid
             ax_r = (pts[:, 0] - cx - 24) / 5
-            ay_r = (pts[:, 1] - cy - 5) / 9
-            az_r = (pts[:, 2] - cz + 15) / 6
+            ay_r = (pts[:, 1] - cy + 2) / 9
+            az_r = (pts[:, 2] - cz + 18) / 6
             in_amyg = np.any(ax_r**2 + ay_r**2 + az_r**2 <= 1.0)
 
             if in_amyg:
@@ -749,8 +751,8 @@ def plot_photon_paths(paths, results, meta, output_dir):
             else:
                 ax.plot(pts[:, 1], pts[:, 2], color="blue", alpha=0.1, linewidth=0.3)
 
-        ax.set_xlim(cy - 50, cy + 50)
-        ax.set_ylim(cz + 50, cz - 50)  # invert Z so surface is on top
+        ax.set_xlim(cy - 100, cy + 100)
+        ax.set_ylim(cz + 90, cz - 90)  # invert Z so surface is on top
         ax.set_xlabel("Y [mm] (anterior-posterior)")
         ax.set_ylabel("Z [mm] (inferior-superior)")
         ax.set_title(f"Sagittal Photon Paths — {wl_key}\n"
@@ -760,17 +762,18 @@ def plot_photon_paths(paths, results, meta, output_dir):
 
         # --- Right: Coronal view (Y=const) ---
         ax2 = axes[1]
-        for radius, color, label in [
-            (48, "#D2B48C", "Scalp"), (44, "#DEB887", "Skull"),
-            (38, "#87CEEB", "CSF"), (36.5, "#CD5C5C", "Gray"),
-            (33, "#F5F5DC", "White")
+        # Coronal semi-axes: (X, Z) = (ML, SI)
+        for (sa_x, sa_z), color, label in [
+            ((78, 85), "#D2B48C", "Scalp"), ((74, 81), "#DEB887", "Skull"),
+            ((67, 74), "#87CEEB", "CSF"), ((65.5, 72.5), "#CD5C5C", "Gray"),
+            ((62, 69), "#F5F5DC", "White")
         ]:
-            ex, ez = _ellipsoid_boundary(cx, cz, radius, radius)
+            ex, ez = _ellipsoid_boundary(cx, cz, sa_x, sa_z)
             ax2.plot(ex, ez, color=color, linewidth=1.0, alpha=0.5)
 
-        # Both amygdalae in coronal view
+        # Both amygdalae in coronal view (center: cx±24, cz-18)
         for amyg_cx_off in [-24, 24]:
-            aex, aez = _ellipsoid_boundary(cx + amyg_cx_off, cz - 15, 5, 6)
+            aex, aez = _ellipsoid_boundary(cx + amyg_cx_off, cz - 18, 5, 6)
             ax2.fill(aex, aez, color=TISSUE_COLORS[6], alpha=0.3)
             ax2.plot(aex, aez, color="red", linewidth=1.5)
 
@@ -778,16 +781,16 @@ def plot_photon_paths(paths, results, meta, output_dir):
             nsteps = path_lens[idx]
             pts = positions[idx, :nsteps, :]
             ax_r = (pts[:, 0] - cx - 24) / 5
-            ay_r = (pts[:, 1] - cy - 5) / 9
-            az_r = (pts[:, 2] - cz + 15) / 6
+            ay_r = (pts[:, 1] - cy + 2) / 9
+            az_r = (pts[:, 2] - cz + 18) / 6
             in_amyg = np.any(ax_r**2 + ay_r**2 + az_r**2 <= 1.0)
             if in_amyg:
                 ax2.plot(pts[:, 0], pts[:, 2], color="red", alpha=0.4, linewidth=0.8)
             else:
                 ax2.plot(pts[:, 0], pts[:, 2], color="blue", alpha=0.1, linewidth=0.3)
 
-        ax2.set_xlim(cx - 50, cx + 50)
-        ax2.set_ylim(cz + 50, cz - 50)
+        ax2.set_xlim(cx - 85, cx + 85)
+        ax2.set_ylim(cz + 90, cz - 90)
         ax2.set_xlabel("X [mm] (left-right)")
         ax2.set_ylabel("Z [mm] (inferior-superior)")
         ax2.set_title(f"Coronal Photon Paths — {wl_key}")
@@ -851,15 +854,15 @@ def plot_photon_paths_by_detector(paths, results, meta, output_dir):
         for ax_i, det_id in enumerate(selected):
             ax = axes[ax_i // cols][ax_i % cols]
 
-            # Draw tissue boundaries (sagittal)
-            for radius, color in [
-                (48, "#D2B48C"), (44, "#DEB887"), (38, "#87CEEB"),
-                (36.5, "#CD5C5C"), (33, "#F5F5DC")
+            # Draw tissue boundaries (sagittal, Y-Z semi-axes)
+            for (sa_y, sa_z), color in [
+                ((95, 85), "#D2B48C"), ((91, 81), "#DEB887"), ((84, 74), "#87CEEB"),
+                ((82.5, 72.5), "#CD5C5C"), ((79, 69), "#F5F5DC")
             ]:
-                ey, ez = _ellipsoid_boundary(cy, cz, radius, radius)
+                ey, ez = _ellipsoid_boundary(cy, cz, sa_y, sa_z)
                 ax.plot(ey, ez, color=color, linewidth=0.8, alpha=0.4)
 
-            aey, aez = _ellipsoid_boundary(cy + 5, cz - 15, 9, 6)
+            aey, aez = _ellipsoid_boundary(cy - 2, cz - 18, 9, 6)
             ax.fill(aey, aez, color=TISSUE_COLORS[6], alpha=0.3)
             ax.plot(aey, aez, color="red", linewidth=1.0)
 
@@ -886,8 +889,8 @@ def plot_photon_paths_by_detector(paths, results, meta, output_dir):
             sds = info.get("sds_mm", "?")
             angle = info.get("angle_deg", "?")
             ax.set_title(f"Det {det_id}: SDS={sds} mm, {angle}°\n({n} paths total)")
-            ax.set_xlim(cy - 50, cy + 50)
-            ax.set_ylim(cz + 50, cz - 50)
+            ax.set_xlim(cy - 100, cy + 100)
+            ax.set_ylim(cz + 90, cz - 90)
             ax.set_xlabel("Y [mm]")
             ax.set_ylabel("Z [mm]")
             ax.set_aspect("equal")
