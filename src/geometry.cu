@@ -18,50 +18,53 @@
 HeadModelParams default_head_model() {
     HeadModelParams p{};
 
-    // Grid: 1000x1000x1000 at 0.1 mm resolution = 100x100x100 mm volume
-    // 0.1mm voxel size for high-resolution photon path tracking
-    p.nx = 1000; p.ny = 1000; p.nz = 1000;
-    p.dx = 0.1f;  // mm
+    // Grid: 400x400x400 at 0.5 mm resolution = 200x200x200 mm volume
+    // 0.5mm voxels balance resolution with memory (64M voxels vs 1B at 0.1mm)
+    p.nx = 400; p.ny = 400; p.nz = 400;
+    p.dx = 0.5f;  // mm
 
-    // Head center is at grid center: (50, 50, 50) mm
+    // Head center is at grid center: (100, 100, 100) mm
     // Ellipsoidal layers (semi-axes in mm)
-    // These represent half-widths along each axis
+    // X = medial-lateral (ML), Y = anterior-posterior (AP), Z = inferior-superior (SI)
+    // Adult head proportions: ~156 mm ML x 190 mm AP x 170 mm SI
+    // Based on Okada & Delpy (2003), Hoshi et al. (2011)
 
     // Scalp outer surface
-    p.scalp_a = 48.0f; p.scalp_b = 48.0f; p.scalp_c = 48.0f;
+    p.scalp_a = 78.0f; p.scalp_b = 95.0f; p.scalp_c = 85.0f;
 
-    // Skull outer (scalp thickness ~3-5 mm)
-    p.skull_a = 44.0f; p.skull_b = 44.0f; p.skull_c = 44.0f;
+    // Skull outer (scalp thickness ~4 mm)
+    p.skull_a = 74.0f; p.skull_b = 91.0f; p.skull_c = 81.0f;
 
-    // CSF outer / skull inner (skull thickness ~6-7 mm)
-    p.csf_a = 38.0f; p.csf_b = 38.0f; p.csf_c = 38.0f;
+    // CSF outer / skull inner (skull thickness ~7 mm)
+    p.csf_a = 67.0f; p.csf_b = 84.0f; p.csf_c = 74.0f;
 
-    // Gray matter outer / CSF inner (CSF ~1-2 mm)
-    p.gm_a = 36.5f; p.gm_b = 36.5f; p.gm_c = 36.5f;
+    // Gray matter outer / CSF inner (CSF ~1.5 mm)
+    p.gm_a = 65.5f; p.gm_b = 82.5f; p.gm_c = 72.5f;
 
-    // White matter outer / GM inner (cortical GM ~3-4 mm)
-    p.wm_a = 33.0f; p.wm_b = 33.0f; p.wm_c = 33.0f;
+    // White matter outer / GM inner (cortical GM ~3.5 mm)
+    p.wm_a = 62.0f; p.wm_b = 79.0f; p.wm_c = 69.0f;
 
-    // Amygdala: ~15-20 mm long, ~10 mm wide, ~12 mm tall
-    // Located in medial temporal lobe, roughly:
-    //   ~25 mm lateral, ~5 mm anterior, ~15 mm inferior to head center
-    // (In our coordinate system, from center at 50,50,50 mm)
+    // Amygdala: ~15-20 mm long (AP), ~10 mm wide (ML), ~12 mm tall (SI)
+    // MNI-based coordinates (Amunts et al. 2005):
+    //   ~24 mm lateral, ~2 mm posterior, ~18 mm inferior to head center
+    // Depth from temporal scalp surface: ~50 mm
+    //   (scalp at x~76mm at this y,z; amygdala at x=24; depth = 52mm)
 
     // Left amygdala
     p.amyg_l_cx = -24.0f;  // left of center (negative X)
-    p.amyg_l_cy =  5.0f;   // slightly anterior
-    p.amyg_l_cz = -15.0f;  // inferior
-    p.amyg_l_a  =  5.0f;   // semi-axis X (medial-lateral)
-    p.amyg_l_b  =  9.0f;   // semi-axis Y (anterior-posterior)
-    p.amyg_l_c  =  6.0f;   // semi-axis Z (inferior-superior)
+    p.amyg_l_cy =  -2.0f;  // slightly posterior
+    p.amyg_l_cz = -18.0f;  // inferior
+    p.amyg_l_a  =   5.0f;  // semi-axis X (medial-lateral)
+    p.amyg_l_b  =   9.0f;  // semi-axis Y (anterior-posterior)
+    p.amyg_l_c  =   6.0f;  // semi-axis Z (inferior-superior)
 
     // Right amygdala (mirror)
     p.amyg_r_cx =  24.0f;
-    p.amyg_r_cy =  5.0f;
-    p.amyg_r_cz = -15.0f;
-    p.amyg_r_a  =  5.0f;
-    p.amyg_r_b  =  9.0f;
-    p.amyg_r_c  =  6.0f;
+    p.amyg_r_cy =  -2.0f;
+    p.amyg_r_cz = -18.0f;
+    p.amyg_r_a  =   5.0f;
+    p.amyg_r_b  =   9.0f;
+    p.amyg_r_c  =   6.0f;
 
     return p;
 }
