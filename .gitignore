@@ -1,0 +1,9 @@
+build/
+data/*.bin
+data/*.json
+figures/
+results/
+__pycache__/
+*.pyc
+venv/
+.env
