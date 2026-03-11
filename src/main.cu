@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
     printf("  Photons per wavelength: %llu\n", (unsigned long long)num_photons);
     printf("  Output directory: %s\n", output_dir.c_str());
     printf("  Laser power: 100 mW (pulsed, ANSI Z136.1 compliant)\n");
-    printf("  Voxel size: %.1f mm\n", hm.dx);
+    printf("  Voxel size: 0.5 mm\n");
     printf("  TPSF bins: %d x %.0f ps = %.1f ns\n\n",
            TPSF_BINS, (double)TPSF_BIN_PS,
            TPSF_BINS * (double)TPSF_BIN_PS / 1000.0);
