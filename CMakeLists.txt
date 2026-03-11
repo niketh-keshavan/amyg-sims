@@ -11,6 +11,11 @@ endif()
 
 find_package(CUDAToolkit REQUIRED)
 
+# curand may be an imported target or a plain library depending on toolkit version
+if(NOT TARGET CUDA::curand)
+    find_library(CURAND_LIB curand HINTS ${CUDAToolkit_LIBRARY_DIR} ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
+endif()
+
 add_executable(mc_fnirs
     src/main.cu
     src/mc_kernel.cu
@@ -19,7 +24,13 @@ add_executable(mc_fnirs
 )
 
 target_include_directories(mc_fnirs PRIVATE include)
-target_link_libraries(mc_fnirs PRIVATE CUDA::curand)
+if(TARGET CUDA::curand)
+    target_link_libraries(mc_fnirs PRIVATE CUDA::curand)
+elseif(CURAND_LIB)
+    target_link_libraries(mc_fnirs PRIVATE ${CURAND_LIB})
+else()
+    message(FATAL_ERROR "curand not found. Install libcurand-dev or set CUDAToolkit_LIBRARY_DIR.")
+endif()
 
 # Optimization flags
 target_compile_options(mc_fnirs PRIVATE
