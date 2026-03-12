@@ -20,7 +20,7 @@
 //   - Primary (0°): SDS 15, 20, 22, 25, 28, 30, 33, 35, 40 mm (dense 20-35)
 //   - ±30° offset: SDS 20, 25, 30, 35 mm
 //   - ±60° offset: SDS 25, 35 mm
-// Total: 25 detectors
+// Total: 23 detectors
 // ---------------------------------------------------------------------------
 
 DetectorLayout default_detector_layout() {

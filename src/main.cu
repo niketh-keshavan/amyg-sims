@@ -36,14 +36,14 @@ static void save_results_json(
     FILE* f = fopen(filename, "w");
     if (!f) return;
 
-    const char* wl_str = (wavelength_idx == 0) ? "760" : "850";
+    const char* wl_str = (wavelength_idx == 0) ? "730" : "850";
 
     fprintf(f, "{\n");
     fprintf(f, "  \"wavelength_nm\": %s,\n", wl_str);
     fprintf(f, "  \"num_photons\": %llu,\n", (unsigned long long)config.num_photons);
     fprintf(f, "  \"voxel_size_mm\": %.2f,\n", config.dx);
     fprintf(f, "  \"grid_size\": [%d, %d, %d],\n", config.nx, config.ny, config.nz);
-    fprintf(f, "  \"laser_power_W\": 0.1,\n");
+    fprintf(f, "  \"laser_power_W\": 0.4,\n");
     fprintf(f, "  \"tpsf_bins\": %d,\n", TPSF_BINS);
     fprintf(f, "  \"tpsf_bin_ps\": %.1f,\n", (double)TPSF_BIN_PS);
     fprintf(f, "  \"time_gate_edges_ps\": [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000],\n");
@@ -117,7 +117,7 @@ static void save_results_json(
 int main(int argc, char** argv) {
     printf("=============================================================\n");
     printf("  fNIRS Monte Carlo - TD/FD Amygdala Oxygenation\n");
-    printf("  Wavelengths: 760 nm & 850 nm | 100 mW pulsed laser\n");
+    printf("  Wavelengths: 730 nm & 850 nm | 400 mW (15mm beam)\n");
     printf("  0.5 mm voxels | Ellipsoidal head model | Photon path recording\n");
     printf("  High-density array | TPSF + Time-gated outputs\n");
     printf("=============================================================\n\n");
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     printf("Configuration:\n");
     printf("  Photons per wavelength: %llu\n", (unsigned long long)num_photons);
     printf("  Output directory: %s\n", output_dir.c_str());
-    printf("  Laser power: 100 mW (pulsed, ANSI Z136.1 compliant)\n");
+    printf("  Laser power: 400 mW (15mm beam, ANSI Z136.1 compliant)\n");
     printf("  Voxel size: 0.5 mm\n");
     printf("  TPSF bins: %d x %.0f ps = %.1f ns\n\n",
            TPSF_BINS, (double)TPSF_BIN_PS,
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
     cudaMalloc(&d_fluence, vol_size * sizeof(float));
 
     // --- Run simulation for each wavelength ---
-    const char* wl_names[] = {"760nm", "850nm"};
+    const char* wl_names[] = {"730nm", "850nm"};
 
     for (int wl = 0; wl < 2; wl++) {
         printf("\n=========================================\n");
@@ -242,7 +242,7 @@ int main(int argc, char** argv) {
         config.src_dy = sy / smag;
         config.src_dz = sz / smag;
 
-        config.beam_radius = 3.5f;  // 7 mm beam diameter (diffusing tip optode)
+        config.beam_radius = 7.5f;  // 15 mm beam diameter (diffusing optode, 400mW ANSI-safe)
 
         config.wavelength_idx = wl;
         get_optical_properties(wl, config.tissue);

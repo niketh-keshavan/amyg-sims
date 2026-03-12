@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-fNIRS Monte Carlo Analysis — TD-Gated Focus (2-min integration)
+fNIRS Monte Carlo Analysis -- TD-Gated Focus (optimized config)
 ----------------------------------------------------------------
-Optimized for time-domain gated measurement of amygdala hemodynamics.
+730/850nm | High-power ANSI-safe beam | Si-PMT detectors | Multi-channel MBLL
 
 Computes:
   1. TD-gated sensitivity by gate and SDS
   2. Optimal gate selection per detector
-  3. Dual-wavelength MBLL inversion at 120s integration
-  4. Expected block-design paradigm detectability
-  5. Integration time sweep
-  6. ANSI Z136.1 safety check
+  3. Single-detector dual-wavelength MBLL
+  4. Multi-channel MBLL (best 3 detectors combined)
+  5. Block-design paradigm detectability
+  6. Integration time sweep
+  7. ANSI Z136.1 safety check
 
 Usage:
     python analyze.py --data-dir ../results
@@ -19,17 +20,21 @@ Usage:
 import json
 import argparse
 import numpy as np
+import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Physical constants and extinction coefficients
+# Physical constants and extinction coefficients (Cope 1991 / Matcher 1995)
 # ---------------------------------------------------------------------------
-EPSILON_HBR = np.array([1.1058,  0.6918]) / 10.0  # [1/(mM*mm)]
-EPSILON_HBO = np.array([0.1496,  1.0507]) / 10.0   # [1/(mM*mm)]
+# Units: mM^-1 cm^-1 (divided by 10 -> mM^-1 mm^-1)
+EPSILON_HBR = np.array([1.3080,  0.6918]) / 10.0  # [1/(mM*mm)] at 730, 850
+EPSILON_HBO = np.array([0.1348,  1.0507]) / 10.0   # [1/(mM*mm)] at 730, 850
 
 H_PLANCK = 6.626e-34
 C_LIGHT  = 3e8
-WAVELENGTHS_M = np.array([760e-9, 850e-9])
+WAVELENGTHS_NM = np.array([730, 850])
+WAVELENGTHS_M  = WAVELENGTHS_NM * 1e-9
+WL_KEYS = ["730nm", "850nm"]
 
 GATE_LABELS = [
     "0-500ps", "0.5-1ns", "1-1.5ns", "1.5-2ns", "2-2.5ns",
@@ -37,17 +42,40 @@ GATE_LABELS = [
 ]
 
 # ---------------------------------------------------------------------------
-# System parameters for realistic TD-fNIRS
+# System parameters -- optimized TD-fNIRS
 # ---------------------------------------------------------------------------
-LASER_POWER_W = 0.1       # 100 mW average
+LASER_POWER_W = 1.0       # 1 W average power
+ANSI_MARGIN = 0.95        # keep irradiance at 95% of the strictest MPE
 MEAS_TIME_S = 120.0       # 2 minutes integration
-DET_EFFICIENCY = 0.10     # 10% detector quantum efficiency (InGaAs SPAD)
+
+# Si-PMT quantum efficiency (wavelength-dependent)
+DET_QE = {
+    "730nm": 0.30,   # 30% at 730nm (Si-PMT sweet spot)
+    "850nm": 0.15,   # 15% at 850nm (Si-PMT NIR falloff)
+}
+
 DARK_COUNT_RATE = 1000    # counts/s per detector
+
+
+def ansi_safe_beam_diameter_mm(power_w, wavelengths_nm, ansi_margin=0.95):
+    """Compute minimum beam diameter to keep irradiance <= margin * min(MPE)."""
+    mpe_vals = []
+    for wl in wavelengths_nm:
+        C_A = 10 ** (0.002 * (wl - 700))
+        mpe_vals.append(0.2 * C_A)  # W/cm^2
+    strictest_mpe = min(mpe_vals)
+    max_irradiance = ansi_margin * strictest_mpe
+    beam_area_cm2 = power_w / max_irradiance
+    beam_radius_cm = np.sqrt(beam_area_cm2 / np.pi)
+    return beam_radius_cm * 2.0 * 10.0
+
+
+BEAM_DIAMETER_MM = ansi_safe_beam_diameter_mm(LASER_POWER_W, WAVELENGTHS_NM, ANSI_MARGIN)
 
 
 def load_results(data_dir):
     results = {}
-    for wl in ["760nm", "850nm"]:
+    for wl in WL_KEYS:
         fpath = data_dir / f"results_{wl}.json"
         if fpath.exists():
             with open(fpath) as f:
@@ -78,7 +106,7 @@ def td_sensitivity(results):
     print("1. TD-GATED AMYGDALA SENSITIVITY (best gate per detector)")
     print("=" * 80)
 
-    for wl_key in ["760nm", "850nm"]:
+    for wl_key in WL_KEYS:
         r = results[wl_key]
         print(f"\n  Wavelength: {r['wavelength_nm']} nm")
         print(f"  {'Det':>4s}  {'SDS':>5s}  {'Ang':>5s}  {'BestGate':>8s}  "
@@ -115,19 +143,19 @@ def td_sensitivity(results):
 # ===================================================================
 def gate_budget(results):
     print("\n" + "=" * 80)
-    print("2. GATE PHOTON BUDGET (scaled to 100mW, 120s, 10% QE)")
+    print(f"2. GATE PHOTON BUDGET ({LASER_POWER_W*1e3:.0f}mW, {MEAS_TIME_S:.0f}s, Si-PMT QE)")
     print("=" * 80)
 
-    for wl_key in ["760nm", "850nm"]:
+    for wl_idx, wl_key in enumerate(WL_KEYS):
         r = results[wl_key]
-        wl_idx = 0 if "760" in wl_key else 1
+        qe = DET_QE[wl_key]
         N_per_sec = photons_per_second(LASER_POWER_W, WAVELENGTHS_M[wl_idx])
         num_sim = r["num_photons"]
-        scale = N_per_sec / num_sim * MEAS_TIME_S * DET_EFFICIENCY
+        scale = N_per_sec / num_sim * MEAS_TIME_S * qe
 
-        print(f"\n  {wl_key} (primary direction, gates with amygdala signal):")
+        print(f"\n  {wl_key} (QE={qe*100:.0f}%, primary direction, gates with amygdala signal):")
         print(f"  {'SDS':>5s}  {'Gate':>8s}  {'DetCounts':>12s}  {'AmygPL':>10s}  "
-              f"{'dOD/µM':>10s}  {'SNR_1µM':>10s}")
+              f"{'dOD/uM':>10s}  {'SNR_1uM':>10s}")
         print("  " + "-" * 65)
 
         for det in r["detectors"]:
@@ -151,27 +179,27 @@ def gate_budget(results):
 
 
 # ===================================================================
-# 3. DUAL-WAVELENGTH MBLL @ 120s
+# 3. SINGLE-DETECTOR DUAL-WAVELENGTH MBLL
 # ===================================================================
-def mbll_analysis(results):
+def mbll_single(results):
     print("\n" + "=" * 80)
-    print("3. DUAL-WAVELENGTH MBLL INVERSION")
-    print(f"   {LASER_POWER_W*1e3:.0f} mW | {MEAS_TIME_S:.0f}s | "
-          f"{DET_EFFICIENCY*100:.0f}% QE | {DARK_COUNT_RATE} cps dark")
+    print("3. SINGLE-DETECTOR MBLL (best gate per SDS)")
+    print(f"   {LASER_POWER_W*1e3:.0f} mW | {MEAS_TIME_S:.0f}s | Si-PMT | {DARK_COUNT_RATE} cps dark")
     print("=" * 80)
 
-    wl_keys = ["760nm", "850nm"]
     N_per_sec = [photons_per_second(LASER_POWER_W, w) for w in WAVELENGTHS_M]
 
     det_data = {}
-    for wl_idx, wl_key in enumerate(wl_keys):
+    for wl_idx, wl_key in enumerate(WL_KEYS):
         r = results[wl_key]
         num_sim = r["num_photons"]
+        qe = DET_QE[wl_key]
         scale = N_per_sec[wl_idx] / num_sim
 
         for det in r["detectors"]:
             sds = det["sds_mm"]
-            if abs(det.get("angle_deg", 0)) > 1:
+            angle = det.get("angle_deg", 0)
+            if abs(angle) > 1:
                 continue
             gates = det.get("time_gates", [])
             for g_idx, gate in enumerate(gates):
@@ -180,17 +208,18 @@ def mbll_analysis(results):
                     det_data[key] = {}
                 gw = gate.get("weight", 0)
                 amyg = gate.get("partial_pathlength_mm", {}).get("amygdala", 0)
-                N_gate = gw * scale * MEAS_TIME_S * DET_EFFICIENCY
+                N_gate = gw * scale * MEAS_TIME_S * qe
                 N_total = N_gate + DARK_COUNT_RATE * MEAS_TIME_S
                 noise = 1.0 / np.sqrt(N_total) if N_total > 0 else float('inf')
                 det_data[key][wl_key] = {
-                    'amyg_pl': amyg, 'N_gate': N_gate, 'noise': noise
+                    'amyg_pl': amyg, 'N_gate': N_gate, 'noise': noise,
+                    'det_id': det['id']
                 }
 
     sds_set = sorted(set(s for s, g in det_data.keys()))
 
-    print(f"\n  {'SDS':>5s}  {'Gate':>8s}  {'N760':>10s}  {'N850':>10s}  "
-          f"{'L_amyg760':>10s}  {'L_amyg850':>10s}  {'minHbO':>8s}  {'minHbR':>8s}  "
+    print(f"\n  {'SDS':>5s}  {'Gate':>8s}  {'N730':>10s}  {'N850':>10s}  "
+          f"{'L_amyg730':>10s}  {'L_amyg850':>10s}  {'minHbO':>8s}  {'minHbR':>8s}  "
           f"{'Status':>12s}")
     print("  " + "-" * 95)
 
@@ -205,37 +234,38 @@ def mbll_analysis(results):
             if key not in det_data:
                 continue
             d = det_data[key]
-            if "760nm" not in d or "850nm" not in d:
+            if WL_KEYS[0] not in d or WL_KEYS[1] not in d:
                 continue
 
-            d760, d850 = d["760nm"], d["850nm"]
-            L760, L850 = d760['amyg_pl'], d850['amyg_pl']
-            if L760 <= 0 or L850 <= 0:
+            d0, d1 = d[WL_KEYS[0]], d[WL_KEYS[1]]
+            L0, L1 = d0['amyg_pl'], d1['amyg_pl']
+            if L0 <= 0 or L1 <= 0:
                 continue
 
             E = np.array([
-                [EPSILON_HBO[0]*L760, EPSILON_HBR[0]*L760],
-                [EPSILON_HBO[1]*L850, EPSILON_HBR[1]*L850]
+                [EPSILON_HBO[0]*L0, EPSILON_HBR[0]*L0],
+                [EPSILON_HBO[1]*L1, EPSILON_HBR[1]*L1]
             ])
             if abs(np.linalg.det(E)) < 1e-20:
                 continue
             E_inv = np.linalg.inv(E)
-            dc = np.abs(E_inv @ np.array([d760['noise'], d850['noise']])) * 1e3
+            dc = np.abs(E_inv @ np.array([d0['noise'], d1['noise']])) * 1e3
 
             if dc[0] < best_min_hbo:
                 best_min_hbo = dc[0]
                 best_result = {
-                    'gate': g_idx, 'N760': d760['N_gate'], 'N850': d850['N_gate'],
-                    'L760': L760, 'L850': L850,
-                    'min_hbo': dc[0], 'min_hbr': dc[1]
+                    'gate': g_idx, 'N0': d0['N_gate'], 'N1': d1['N_gate'],
+                    'L0': L0, 'L1': L1,
+                    'min_hbo': dc[0], 'min_hbr': dc[1],
+                    'det_id': d0['det_id']
                 }
 
         if best_result:
             r = best_result
             status = "DETECTABLE" if r['min_hbo'] < 1.0 else f"need>{r['min_hbo']:.1f}uM"
             print(f"  {sds:5.0f}  {GATE_LABELS[r['gate']]:>8s}  "
-                  f"{r['N760']:10.2e}  {r['N850']:10.2e}  "
-                  f"{r['L760']:10.6f}  {r['L850']:10.6f}  "
+                  f"{r['N0']:10.2e}  {r['N1']:10.2e}  "
+                  f"{r['L0']:10.6f}  {r['L1']:10.6f}  "
                   f"{r['min_hbo']:8.3f}  {r['min_hbr']:8.3f}  {status:>12s}")
             best_configs.append((sds, best_result))
 
@@ -243,21 +273,180 @@ def mbll_analysis(results):
 
 
 # ===================================================================
-# 4. BLOCK DESIGN FEASIBILITY
+# 4. MULTI-CHANNEL MBLL (BEST 3 DETECTORS)
 # ===================================================================
-def block_design(best_configs):
+def mbll_multi_channel(results):
     print("\n" + "=" * 80)
-    print("4. BLOCK-DESIGN PARADIGM (15s stim, 15s rest, 20 trials)")
-    print("   Expected amygdala: 2-5 µM HbO, -0.5 to -1.5 µM HbR")
+    print("4. MULTI-CHANNEL MBLL (best 3 detectors, all usable gates)")
+    print(f"   {LASER_POWER_W*1e3:.0f} mW | {MEAS_TIME_S:.0f}s | Si-PMT | {DARK_COUNT_RATE} cps dark")
+    print("=" * 80)
+
+    N_per_sec = [photons_per_second(LASER_POWER_W, w) for w in WAVELENGTHS_M]
+
+    # Gather per-detector, per-gate, per-wavelength data
+    all_det_info = []  # list of (det_id, sds, angle, gate_measurements)
+    n_dets = len(results[WL_KEYS[0]]["detectors"])
+
+    for det_idx in range(n_dets):
+        det0 = results[WL_KEYS[0]]["detectors"][det_idx]
+        det1 = results[WL_KEYS[1]]["detectors"][det_idx]
+        sds = det0["sds_mm"]
+        angle = det0.get("angle_deg", 0)
+
+        gate_data = []
+        n_gates = min(len(det0.get("time_gates", [])),
+                      len(det1.get("time_gates", [])))
+        for g_idx in range(n_gates):
+            g0 = det0["time_gates"][g_idx]
+            g1 = det1["time_gates"][g_idx]
+            L0 = g0.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            L1 = g1.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            if L0 <= 0 or L1 <= 0:
+                continue
+
+            gw0 = g0.get("weight", 0)
+            gw1 = g1.get("weight", 0)
+            qe0, qe1 = DET_QE[WL_KEYS[0]], DET_QE[WL_KEYS[1]]
+            scale0 = N_per_sec[0] / results[WL_KEYS[0]]["num_photons"]
+            scale1 = N_per_sec[1] / results[WL_KEYS[1]]["num_photons"]
+            N0 = gw0 * scale0 * MEAS_TIME_S * qe0 + DARK_COUNT_RATE * MEAS_TIME_S
+            N1 = gw1 * scale1 * MEAS_TIME_S * qe1 + DARK_COUNT_RATE * MEAS_TIME_S
+
+            gate_data.append({
+                'gate': g_idx, 'L0': L0, 'L1': L1,
+                'N0': N0, 'N1': N1,
+                'sigma0': 1.0/np.sqrt(N0) if N0 > 0 else float('inf'),
+                'sigma1': 1.0/np.sqrt(N1) if N1 > 0 else float('inf'),
+            })
+
+        if gate_data:
+            # Detector-level metric: sum of (L_amyg * sqrt(N)) across all valid gates
+            metric = sum(gd['L0']*np.sqrt(gd['N0']) + gd['L1']*np.sqrt(gd['N1'])
+                         for gd in gate_data)
+            all_det_info.append({
+                'det_id': det_idx, 'sds': sds, 'angle': angle,
+                'gates': gate_data, 'metric': metric
+            })
+
+    # Sort by metric, take top 3
+    all_det_info.sort(key=lambda x: x['metric'], reverse=True)
+    top3 = all_det_info[:3]
+
+    print(f"\n  Selected detectors (by amygdala sensitivity metric):")
+    for rank, info in enumerate(top3):
+        n_valid = len(info['gates'])
+        print(f"    #{rank+1}: Det {info['det_id']} SDS={info['sds']:.0f}mm "
+              f"angle={info['angle']:+.0f}deg  ({n_valid} valid gates, metric={info['metric']:.2f})")
+
+    # Build overdetermined weighted least-squares system
+    # Each measurement: dOD_{d,g,w} = (e_HbO * dHbO + e_HbR * dHbR) * L_amyg_{d,g,w}
+    # Noise: sigma = 1/sqrt(N)
+    rows_A = []
+    sigma_vec = []
+
+    for info in top3:
+        for gd in info['gates']:
+            # Wavelength 0 (730nm) measurement
+            rows_A.append([EPSILON_HBO[0] * gd['L0'], EPSILON_HBR[0] * gd['L0']])
+            sigma_vec.append(gd['sigma0'])
+            # Wavelength 1 (850nm) measurement
+            rows_A.append([EPSILON_HBO[1] * gd['L1'], EPSILON_HBR[1] * gd['L1']])
+            sigma_vec.append(gd['sigma1'])
+
+    A = np.array(rows_A)
+    sigma = np.array(sigma_vec)
+    n_measurements = len(sigma)
+
+    print(f"\n  System: {n_measurements} measurements x 2 unknowns (HbO, HbR)")
+
+    # Weighted least squares: W = diag(1/sigma^2)
+    W = np.diag(1.0 / sigma**2)
+    AW = A.T @ W
+    AWA = AW @ A
+    if abs(np.linalg.det(AWA)) < 1e-30:
+        print("  ERROR: singular system")
+        return None
+
+    cov = np.linalg.inv(AWA)
+    min_hbo = np.sqrt(cov[0, 0]) * 1e3  # convert to uM
+    min_hbr = np.sqrt(cov[1, 1]) * 1e3
+
+    print(f"\n  MULTI-CHANNEL RESULT ({MEAS_TIME_S:.0f}s integration):")
+    print(f"    Min detectable HbO: {min_hbo:.4f} uM")
+    print(f"    Min detectable HbR: {min_hbr:.4f} uM")
+    print(f"    Correlation(HbO,HbR): {cov[0,1]/np.sqrt(cov[0,0]*cov[1,1]):.3f}")
+
+    # Compare with single-detector best
+    print(f"\n  vs. Single-best-detector comparison:")
+    if all_det_info:
+        best_single = all_det_info[0]
+        # Single-detector MBLL at best gate
+        best_gate = max(best_single['gates'],
+                        key=lambda g: min(g['L0']*np.sqrt(g['N0']),
+                                          g['L1']*np.sqrt(g['N1'])))
+        E = np.array([
+            [EPSILON_HBO[0]*best_gate['L0'], EPSILON_HBR[0]*best_gate['L0']],
+            [EPSILON_HBO[1]*best_gate['L1'], EPSILON_HBR[1]*best_gate['L1']]
+        ])
+        if abs(np.linalg.det(E)) > 1e-20:
+            E_inv = np.linalg.inv(E)
+            dc_single = np.abs(E_inv @ np.array([best_gate['sigma0'],
+                                                  best_gate['sigma1']])) * 1e3
+            print(f"    Single det {best_single['det_id']} best gate: "
+                  f"HbO={dc_single[0]:.4f} uM, HbR={dc_single[1]:.4f} uM")
+            print(f"    Multi-channel improvement: "
+                  f"HbO {dc_single[0]/min_hbo:.1f}x, HbR {dc_single[1]/min_hbr:.1f}x")
+
+    # Scale to different integration times
+    print(f"\n  Min detectable vs integration time:")
+    print(f"  {'Time':>8s}  {'HbO [uM]':>10s}  {'HbR [uM]':>10s}  {'HbO status':>12s}  {'HbR status':>12s}")
+    print("  " + "-" * 55)
+    for t in [1, 5, 10, 15, 30, 60, 120, 300]:
+        hbo_t = min_hbo * np.sqrt(MEAS_TIME_S / t)
+        hbr_t = min_hbr * np.sqrt(MEAS_TIME_S / t)
+        label = f"{t}s" if t < 60 else f"{t//60}m"
+        hbo_s = "OK" if hbo_t < 1.0 else "marginal" if hbo_t < 2.0 else "no"
+        hbr_s = "OK" if hbr_t < 1.0 else "marginal" if hbr_t < 2.0 else "no"
+        print(f"  {label:>8s}  {hbo_t:10.4f}  {hbr_t:10.4f}  {hbo_s:>12s}  {hbr_s:>12s}")
+
+    return {'min_hbo': min_hbo, 'min_hbr': min_hbr, 'cov': cov, 'top3': top3}
+
+
+# ===================================================================
+# 5. BLOCK DESIGN FEASIBILITY
+# ===================================================================
+def block_design(multi_result, best_configs):
+    print("\n" + "=" * 80)
+    print("5. BLOCK-DESIGN PARADIGM (15s stim, 15s rest, 20 trials)")
+    print("   Expected amygdala: 2-5 uM HbO, -0.5 to -1.5 uM HbR")
     print("=" * 80)
 
     n_trials = 20
     trial_dur = 15.0
     trial_gain = np.sqrt(n_trials)
 
-    print(f"\n  SNR per HbO magnitude (trial-averaged, {n_trials} trials):\n")
+    if multi_result:
+        mc_hbo = multi_result['min_hbo']
+        mc_hbr = multi_result['min_hbr']
+        trial_min_hbo = mc_hbo * np.sqrt(MEAS_TIME_S / trial_dur)
+        trial_min_hbr = mc_hbr * np.sqrt(MEAS_TIME_S / trial_dur)
+        avg_min_hbo = trial_min_hbo / trial_gain
+        avg_min_hbr = trial_min_hbr / trial_gain
+
+        print(f"\n  MULTI-CHANNEL (3 best detectors):")
+        print(f"    Single-trial noise floor: HbO={trial_min_hbo:.3f} uM, HbR={trial_min_hbr:.3f} uM")
+        print(f"    After {n_trials}-trial avg:    HbO={avg_min_hbo:.4f} uM, HbR={avg_min_hbr:.4f} uM")
+
+        print(f"\n    SNR for expected amygdala responses:")
+        for hbo_mag, hbr_mag in [(2.0, -0.5), (3.0, -1.0), (5.0, -1.5)]:
+            snr_hbo = hbo_mag / avg_min_hbo if avg_min_hbo > 0 else 0
+            snr_hbr = abs(hbr_mag) / avg_min_hbr if avg_min_hbr > 0 else 0
+            print(f"      HbO={hbo_mag:+.0f}uM -> SNR={snr_hbo:.1f}  |  "
+                  f"HbR={hbr_mag:+.1f}uM -> SNR={snr_hbr:.1f}")
+
+    print(f"\n  SINGLE-DETECTOR (per SDS, trial-averaged):")
     print(f"  {'SDS':>5s}  {'Gate':>8s}  {'eff_min':>8s}  "
-          f"{'1µM':>7s}  {'2µM':>7s}  {'3µM':>7s}  {'5µM':>7s}  {'verdict':>10s}")
+          f"{'1uM':>7s}  {'2uM':>7s}  {'3uM':>7s}  {'5uM':>7s}  {'verdict':>10s}")
     print("  " + "-" * 68)
 
     for sds, cfg in best_configs:
@@ -272,14 +461,13 @@ def block_design(best_configs):
 
 
 # ===================================================================
-# 5. INTEGRATION TIME SWEEP
+# 6. INTEGRATION TIME SWEEP
 # ===================================================================
 def time_sweep(results):
     print("\n" + "=" * 80)
-    print("5. MIN DETECTABLE HbO [µM] vs INTEGRATION TIME")
+    print("6. MIN DETECTABLE HbO [uM] vs INTEGRATION TIME (single detector)")
     print("=" * 80)
 
-    wl_keys = ["760nm", "850nm"]
     N_per_sec = [photons_per_second(LASER_POWER_W, w) for w in WAVELENGTHS_M]
     times = [1, 5, 10, 15, 30, 60, 120]
 
@@ -290,56 +478,45 @@ def time_sweep(results):
     print()
     print("  " + "-" * (7 + 8 * len(times)))
 
-    r760, r850 = results["760nm"], results["850nm"]
+    r0, r1 = results[WL_KEYS[0]], results[WL_KEYS[1]]
 
-    for det760, det850 in zip(r760["detectors"], r850["detectors"]):
-        if abs(det760.get("angle_deg", 0)) > 1:
+    for det0, det1 in zip(r0["detectors"], r1["detectors"]):
+        if abs(det0.get("angle_deg", 0)) > 1:
             continue
-        sds = det760["sds_mm"]
+        sds = det0["sds_mm"]
 
-        # Find best gate (at 1s baseline)
         best_min = float('inf')
-        best_noise_760_1s = None
-        best_noise_850_1s = None
-        best_L760 = 0
-        best_L850 = 0
 
-        for g_idx in range(min(len(det760.get("time_gates", [])),
-                               len(det850.get("time_gates", [])))):
-            g760 = det760["time_gates"][g_idx]
-            g850 = det850["time_gates"][g_idx]
-            L760 = g760.get("partial_pathlength_mm", {}).get("amygdala", 0)
-            L850 = g850.get("partial_pathlength_mm", {}).get("amygdala", 0)
-            if L760 <= 0 or L850 <= 0:
+        for g_idx in range(min(len(det0.get("time_gates", [])),
+                               len(det1.get("time_gates", [])))):
+            g0 = det0["time_gates"][g_idx]
+            g1 = det1["time_gates"][g_idx]
+            L0 = g0.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            L1 = g1.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            if L0 <= 0 or L1 <= 0:
                 continue
 
-            # Noise at 1s
-            gw760 = g760.get("weight", 0)
-            gw850 = g850.get("weight", 0)
-            scale760 = N_per_sec[0] / r760["num_photons"]
-            scale850 = N_per_sec[1] / r850["num_photons"]
-            N760 = gw760 * scale760 * 1.0 * DET_EFFICIENCY + DARK_COUNT_RATE
-            N850 = gw850 * scale850 * 1.0 * DET_EFFICIENCY + DARK_COUNT_RATE
-            n760 = 1.0 / np.sqrt(N760) if N760 > 0 else float('inf')
-            n850 = 1.0 / np.sqrt(N850) if N850 > 0 else float('inf')
+            gw0, gw1 = g0.get("weight", 0), g1.get("weight", 0)
+            scale0 = N_per_sec[0] / r0["num_photons"]
+            scale1 = N_per_sec[1] / r1["num_photons"]
+            N0 = gw0 * scale0 * 1.0 * DET_QE[WL_KEYS[0]] + DARK_COUNT_RATE
+            N1 = gw1 * scale1 * 1.0 * DET_QE[WL_KEYS[1]] + DARK_COUNT_RATE
+            n0 = 1.0 / np.sqrt(N0) if N0 > 0 else float('inf')
+            n1 = 1.0 / np.sqrt(N1) if N1 > 0 else float('inf')
 
             E = np.array([
-                [EPSILON_HBO[0]*L760, EPSILON_HBR[0]*L760],
-                [EPSILON_HBO[1]*L850, EPSILON_HBR[1]*L850]
+                [EPSILON_HBO[0]*L0, EPSILON_HBR[0]*L0],
+                [EPSILON_HBO[1]*L1, EPSILON_HBR[1]*L1]
             ])
             if abs(np.linalg.det(E)) < 1e-20:
                 continue
             E_inv = np.linalg.inv(E)
-            dc = np.abs(E_inv @ np.array([n760, n850])) * 1e3
+            dc = np.abs(E_inv @ np.array([n0, n1])) * 1e3
 
             if dc[0] < best_min:
                 best_min = dc[0]
-                best_noise_760_1s = n760
-                best_noise_850_1s = n850
-                best_L760 = L760
-                best_L850 = L850
 
-        if best_noise_760_1s is None:
+        if best_min > 1e5:
             continue
 
         line = f"  {sds:5.0f}"
@@ -348,72 +525,88 @@ def time_sweep(results):
             line += f"  {min_hbo:6.2f}"
         print(line)
 
-    print(f"\n  Values = min detectable ΔHbO [µM] (dual-λ MBLL)")
-    print(f"  Target: <1 µM single-trial, <2 µM block-averaged")
+    print(f"\n  Values = min detectable dHbO [uM] (dual-wavelength MBLL)")
+    print(f"  Target: <1 uM single-trial, <2 uM block-averaged")
 
 
 # ===================================================================
-# 6. SAFETY CHECK
+# 7. SAFETY CHECK
 # ===================================================================
 def safety_check():
     print("\n" + "=" * 80)
-    print("6. ANSI Z136.1 LASER SAFETY")
+    print("7. ANSI Z136.1 LASER SAFETY")
     print("=" * 80)
 
-    beam_area = np.pi * (0.35) ** 2  # 7mm diameter
+    beam_radius_cm = (BEAM_DIAMETER_MM / 2.0) / 10.0
+    beam_area = np.pi * beam_radius_cm ** 2
     irradiance = LASER_POWER_W / beam_area
 
-    for wl in [760, 850]:
+    print(f"  Beam: {BEAM_DIAMETER_MM:.0f}mm diameter, area={beam_area:.3f} cm^2")
+    print(f"  Power: {LASER_POWER_W*1e3:.0f} mW -> Irradiance: {irradiance:.4f} W/cm^2")
+    print(f"  ANSI margin target: {ANSI_MARGIN*100:.0f}% of strictest wavelength MPE")
+
+    for wl in WAVELENGTHS_NM:
         C_A = 10 ** (0.002 * (wl - 700))
         mpe = 0.2 * C_A
         ratio = irradiance / mpe
-        print(f"  {wl} nm: MPE={mpe:.3f} W/cm^2, actual={irradiance:.3f}, "
-              f"ratio={ratio:.3f} ({'SAFE' if ratio < 1 else 'EXCEEDS'})")
+        print(f"  {wl} nm: MPE={mpe:.4f} W/cm^2, ratio={ratio:.4f} "
+              f"({'SAFE' if ratio < 1 else 'EXCEEDS MPE'})")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="fNIRS MC — TD-Gated Analysis (2-min integration)")
+        description="fNIRS MC -- TD-Gated Analysis (optimized config)")
     parser.add_argument("--data-dir", type=str, default="../results")
     args = parser.parse_args()
     data_dir = Path(args.data_dir)
 
     print("=" * 80)
-    print("  fNIRS MC Analysis — TD-Gated, 2-min Integration")
-    print(f"  Laser: {LASER_POWER_W*1e3:.0f} mW | Det: {DET_EFFICIENCY*100:.0f}% QE | "
+    print("  fNIRS MC Analysis -- 730/850nm, Si-PMT, Multi-Channel")
+    print(f"  Laser: {LASER_POWER_W*1e3:.0f} mW ({BEAM_DIAMETER_MM:.0f}mm beam) | "
+          f"Det: Si-PMT ({DET_QE[WL_KEYS[0]]*100:.0f}%/{DET_QE[WL_KEYS[1]]*100:.0f}%) | "
           f"Dark: {DARK_COUNT_RATE} cps")
     print("=" * 80)
 
     results = load_results(data_dir)
-    tpsf_760 = load_tpsf(data_dir, "760nm")
-    tpsf_850 = load_tpsf(data_dir, "850nm")
+    missing = [wl for wl in WL_KEYS if wl not in results]
+    if missing:
+        print(f"ERROR: missing required result files for {', '.join(missing)} in {data_dir}")
+        print("Expected files like: results_730nm.json, results_850nm.json")
+        print("Run the simulator with both wavelengths and copy fresh data before analysis.")
+        sys.exit(1)
 
-    for key, tpsf in [("760nm", tpsf_760), ("850nm", tpsf_850)]:
+    tpsf_0 = load_tpsf(data_dir, WL_KEYS[0])
+    tpsf_1 = load_tpsf(data_dir, WL_KEYS[1])
+
+    for key, tpsf in [(WL_KEYS[0], tpsf_0), (WL_KEYS[1], tpsf_1)]:
         if tpsf is not None:
             print(f"  TPSF {key}: {tpsf.shape}")
 
     td_sensitivity(results)
     gate_budget(results)
-    best_configs = mbll_analysis(results)
-    block_design(best_configs)
+    best_configs = mbll_single(results)
+    multi_result = mbll_multi_channel(results)
+    block_design(multi_result, best_configs)
     time_sweep(results)
     safety_check()
 
     print("\n" + "=" * 80)
     print("VERDICT")
     print("=" * 80)
+    if multi_result:
+        print(f"  Multi-channel (3 best detectors, all gates):")
+        print(f"    Min detectable (120s): HbO={multi_result['min_hbo']:.4f} uM, "
+              f"HbR={multi_result['min_hbr']:.4f} uM")
+        if multi_result['min_hbo'] < 1.0 and multi_result['min_hbr'] < 1.0:
+            print(f"  >> BOTH HbO AND HbR DETECTABLE <<")
+        elif multi_result['min_hbo'] < 1.0:
+            print(f"  >> HbO DETECTABLE, HbR marginal/needs block averaging <<")
     if best_configs:
         best = min(best_configs, key=lambda x: x[1]['min_hbo'])
         sds, cfg = best
-        print(f"  Best: SDS={sds:.0f}mm, gate={GATE_LABELS[cfg['gate']]}")
-        print(f"  Min detectable (120s): HbO={cfg['min_hbo']:.3f} µM, "
-              f"HbR={cfg['min_hbr']:.3f} µM")
-        if cfg['min_hbo'] < 1.0:
-            print(f"  >> 1 µM HbO DETECTABLE with 2-min TD-gated fNIRS <<")
-        elif cfg['min_hbo'] < 2.0:
-            print(f"  >> Detectable with block averaging (20 trials) <<")
-        else:
-            print(f"  >> Marginal — need longer integration or more power <<")
+        print(f"  Single-detector best: SDS={sds:.0f}mm, gate={GATE_LABELS[cfg['gate']]}")
+        print(f"    Min detectable (120s): HbO={cfg['min_hbo']:.3f} uM, "
+              f"HbR={cfg['min_hbr']:.3f} uM")
 
 
 if __name__ == "__main__":
