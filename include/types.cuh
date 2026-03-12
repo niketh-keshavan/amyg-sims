@@ -58,6 +58,9 @@ struct SimConfig {
     // Source direction (unit vector, typically pointing inward)
     float src_dx, src_dy, src_dz;
 
+    // Beam radius [mm] (half of beam diameter; 0 = pencil beam)
+    float beam_radius;
+
     // Wavelength index (0 = 760 nm, 1 = 850 nm)
     int wavelength_idx;
 
