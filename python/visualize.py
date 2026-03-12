@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-Visualization for fNIRS Monte Carlo TD/FD/Chirp simulation results.
+Visualization for TD-Gated fNIRS Monte Carlo (2-min integration focus).
 
 Generates:
   1. Tissue volume cross-sections
-  2. Fluence maps (log scale)
-  3. CW sensitivity by angle direction
-  4. TPSF curves for different SDS
-  5. Time-gated sensitivity heatmap
-  6. Frequency-domain phase & amplitude
-  7. SNR comparison (CW vs TD vs Chirp)
-  8. Minimum detectable concentration
+  2. Fluence maps
+  3. TPSF curves
+  4. Time-gated amygdala sensitivity heatmap (fine gates)
+  5. Gate photon counts
+  6. TD-gated SNR vs SDS (120s integration)
+  7. Min detectable HbO/HbR (dual-λ MBLL, 120s)
+  8. Integration time vs sensitivity curve
+  9. Block-design expected signal
+ 10. Photon paths
 
 Usage:
     python visualize.py --data-dir ../results --output-dir ../figures
@@ -41,16 +43,22 @@ TISSUE_CMAP = ListedColormap(TISSUE_COLORS)
 TISSUE_NAMES = ["Air", "Scalp", "Skull", "CSF", "Gray Matter",
                 "White Matter", "Amygdala"]
 
-GATE_LABELS = ["0–500 ps", "0.5–1 ns", "1–1.5 ns",
-               "1.5–2.5 ns", "2.5–4 ns", "4+ ns"]
+GATE_LABELS = [
+    "0-500ps", "0.5-1ns", "1-1.5ns", "1.5-2ns", "2-2.5ns",
+    "2.5-3ns", "3-3.5ns", "3.5-4ns", "4-5ns", "5ns+"
+]
 
-EPSILON_HBR = np.array([1.1058, 0.6918]) / 10.0   # [1/(mM·mm)]
+EPSILON_HBR = np.array([1.1058, 0.6918]) / 10.0
 EPSILON_HBO = np.array([0.1496, 1.0507]) / 10.0
 H_PLANCK = 6.626e-34
 C_LIGHT = 3e8
+WAVELENGTHS_M = np.array([760e-9, 850e-9])
 
-ANGLE_COLORS = {0: "#2196F3", 30: "#4CAF50", -30: "#FF9800", 60: "#9C27B0", -60: "#F44336"}
-ANGLE_MARKERS = {0: "o", 30: "s", -30: "D", 60: "^", -60: "v"}
+# System parameters
+LASER_POWER = 0.1
+MEAS_TIME = 120.0
+DET_EFF = 0.10
+DARK_RATE = 1000
 
 plt.rcParams.update({
     "font.size": 11,
@@ -70,10 +78,7 @@ def load_data(data_dir):
     nx, ny, nz = meta["nx"], meta["ny"], meta["nz"]
 
     vol_path = data_dir / "volume.bin"
-    if vol_path.exists():
-        vol = np.fromfile(vol_path, dtype=np.uint8).reshape((nz, ny, nx))
-    else:
-        vol = None  # Large grid — volume.bin skipped
+    vol = np.fromfile(vol_path, dtype=np.uint8).reshape((nz, ny, nx)) if vol_path.exists() else None
 
     fluence = {}
     for wl in ["760nm", "850nm"]:
@@ -95,7 +100,6 @@ def load_data(data_dir):
             raw = np.fromfile(fp, dtype=np.float64)
             tpsf[wl] = raw.reshape(len(raw) // 512, 512)
 
-    # Photon paths
     paths = {}
     MAX_PATH_STEPS = 2048
     for wl in ["760nm", "850nm"]:
@@ -108,27 +112,22 @@ def load_data(data_dir):
             path_lens = raw_meta[1::2]
             raw_pos = np.fromfile(pos_fp, dtype=np.float32)
             positions = raw_pos.reshape(num_paths, MAX_PATH_STEPS, 3)
-            # Filter out invalidated paths (path_len == 0)
             valid = path_lens > 0
             paths[wl] = {
                 "det_ids": det_ids[valid],
                 "path_lens": path_lens[valid],
                 "positions": positions[valid],
             }
-            print(f"  Loaded {valid.sum()}/{num_paths} valid paths for {wl}")
 
     return vol, fluence, results, tpsf, meta, paths
 
 
-def _get_dets_by_angle(results, wl_key):
-    """Group detectors by angle. Returns dict angle -> sorted list of dets."""
-    groups = {}
-    for det in results[wl_key]["detectors"]:
-        ang = int(round(det.get("angle_deg", 0)))
-        groups.setdefault(ang, []).append(det)
-    for ang in groups:
-        groups[ang].sort(key=lambda d: d["sds_mm"])
-    return groups
+def _primary_dets(results, wl_key):
+    return [d for d in results[wl_key]["detectors"] if abs(d.get("angle_deg", 0)) < 1]
+
+
+def _photons_per_sec(wl_idx):
+    return LASER_POWER / (H_PLANCK * C_LIGHT / WAVELENGTHS_M[wl_idx])
 
 
 # ---------------------------------------------------------------------------
@@ -142,19 +141,19 @@ def plot_tissue_slices(vol, meta, output_dir):
     z_amyg = nz // 2 - int(18.0 / dx)
     im = axes[0].imshow(vol[z_amyg], cmap=TISSUE_CMAP, vmin=0, vmax=6,
                         extent=[0, nx*dx, ny*dx, 0], interpolation="nearest")
-    axes[0].set_title(f"Axial  z = {z_amyg * dx:.0f} mm (amygdala level)")
+    axes[0].set_title(f"Axial z={z_amyg*dx:.0f}mm (amygdala)")
     axes[0].set_xlabel("X [mm]"); axes[0].set_ylabel("Y [mm]")
 
     y_amyg = ny // 2 - int(2.0 / dx)
     axes[1].imshow(vol[:, y_amyg, :], cmap=TISSUE_CMAP, vmin=0, vmax=6,
                    extent=[0, nx*dx, nz*dx, 0], interpolation="nearest")
-    axes[1].set_title(f"Coronal  y = {y_amyg * dx:.0f} mm")
+    axes[1].set_title(f"Coronal y={y_amyg*dx:.0f}mm")
     axes[1].set_xlabel("X [mm]"); axes[1].set_ylabel("Z [mm]")
 
     x_amyg = nx // 2 + int(24.0 / dx)
     axes[2].imshow(vol[:, :, x_amyg], cmap=TISSUE_CMAP, vmin=0, vmax=6,
                    extent=[0, ny*dx, nz*dx, 0], interpolation="nearest")
-    axes[2].set_title(f"Sagittal  x = {x_amyg * dx:.0f} mm (R amygdala)")
+    axes[2].set_title(f"Sagittal x={x_amyg*dx:.0f}mm (R amyg)")
     axes[2].set_xlabel("Y [mm]"); axes[2].set_ylabel("Z [mm]")
 
     cbar = fig.colorbar(im, ax=axes, ticks=range(7), shrink=0.8)
@@ -162,7 +161,6 @@ def plot_tissue_slices(vol, meta, output_dir):
     plt.tight_layout()
     plt.savefig(output_dir / "tissue_slices.png", dpi=150, bbox_inches="tight")
     plt.close()
-    print("  Saved tissue_slices.png")
 
 
 # ---------------------------------------------------------------------------
@@ -179,11 +177,11 @@ def plot_fluence(vol, fluence, meta, output_dir):
 
         slices = [
             (vol[:, :, x_amyg], flu[:, :, x_amyg],
-             f"Sagittal x={x_amyg*dx:.0f} mm", [0, ny*dx, nz*dx, 0], "Y [mm]", "Z [mm]"),
+             f"Sagittal x={x_amyg*dx:.0f}mm", [0, ny*dx, nz*dx, 0]),
             (vol[z_amyg], flu[z_amyg],
-             "Axial (amygdala level)", [0, nx*dx, ny*dx, 0], "X [mm]", "Y [mm]"),
+             "Axial (amygdala)", [0, nx*dx, ny*dx, 0]),
         ]
-        for ax, (ts, fs, title, ext, xl, yl) in zip(axes, slices):
+        for ax, (ts, fs, title, ext) in zip(axes, slices):
             ax.imshow(ts, cmap=TISSUE_CMAP, vmin=0, vmax=6,
                       extent=ext, interpolation="nearest", alpha=0.3)
             fm = np.ma.masked_where(fs <= 0, fs)
@@ -192,68 +190,25 @@ def plot_fluence(vol, fluence, meta, output_dir):
                                extent=ext, interpolation="bilinear", alpha=0.7)
                 fig.colorbar(im, ax=ax, label="Fluence [a.u.]", shrink=0.8)
             ax.set_title(f"Fluence {wl_key} — {title}")
-            ax.set_xlabel(xl); ax.set_ylabel(yl)
 
         plt.tight_layout()
         plt.savefig(output_dir / f"fluence_{wl_key}.png", dpi=150, bbox_inches="tight")
         plt.close()
-        print(f"  Saved fluence_{wl_key}.png")
 
 
 # ---------------------------------------------------------------------------
-# 3. CW sensitivity by angle direction
-# ---------------------------------------------------------------------------
-def plot_cw_sensitivity(results, output_dir):
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
-
-    for wl_key, ls in [("760nm", "-"), ("850nm", "--")]:
-        groups = _get_dets_by_angle(results, wl_key)
-        for ang, dets in sorted(groups.items()):
-            if len(dets) < 2:
-                continue
-            sds = [d["sds_mm"] for d in dets]
-            weights = [d["total_weight"] for d in dets]
-            amyg_pl = [d["partial_pathlength_mm"]["amygdala"] for d in dets]
-            sens = [a / d["mean_pathlength_mm"] if d["mean_pathlength_mm"] > 0 else 0
-                    for a, d in zip(amyg_pl, dets)]
-
-            color = ANGLE_COLORS.get(ang, "gray")
-            marker = ANGLE_MARKERS.get(ang, "x")
-            label = f"{wl_key} {ang:+d}°" if wl_key == "760nm" else None
-
-            axes[0].semilogy(sds, weights, ls=ls, marker=marker, color=color,
-                             label=label, markersize=5, linewidth=1.2)
-            axes[1].plot(sds, amyg_pl, ls=ls, marker=marker, color=color,
-                         label=label, markersize=5, linewidth=1.2)
-            axes[2].plot(sds, [s * 100 for s in sens], ls=ls, marker=marker,
-                         color=color, label=label, markersize=5, linewidth=1.2)
-
-    axes[0].set_ylabel("Detected Weight"); axes[0].set_title("Signal Intensity")
-    axes[1].set_ylabel("Amygdala Partial PL [mm]"); axes[1].set_title("Amygdala Pathlength")
-    axes[2].set_ylabel("Sensitivity [%]"); axes[2].set_title("Amygdala Sensitivity")
-
-    for ax in axes:
-        ax.set_xlabel("Source-Detector Separation [mm]")
-        ax.grid(True, alpha=0.3)
-
-    axes[0].legend(fontsize=8, ncol=2, loc="upper right")
-    fig.suptitle("CW Analysis — HD Array (solid = 760 nm, dashed = 850 nm)", fontsize=14, y=1.01)
-    plt.tight_layout()
-    plt.savefig(output_dir / "cw_sensitivity_by_angle.png", dpi=150, bbox_inches="tight")
-    plt.close()
-    print("  Saved cw_sensitivity_by_angle.png")
-
-
-# ---------------------------------------------------------------------------
-# 4. TPSF curves
+# 3. TPSF curves with gate overlay
 # ---------------------------------------------------------------------------
 def plot_tpsf(results, tpsf, output_dir):
     if "760nm" not in tpsf:
         return
     bin_ps = 10.0
-    time_ns = np.arange(512) * bin_ps / 1000.0  # ns
+    time_ns = np.arange(512) * bin_ps / 1000.0
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 5.5))
+    # Gate edges in ns
+    gate_edges_ns = [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0]
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
     for ax, wl_key in zip(axes, ["760nm", "850nm"]):
         if wl_key not in tpsf:
@@ -262,44 +217,46 @@ def plot_tpsf(results, tpsf, output_dir):
         data = tpsf[wl_key]
         cmap = plt.cm.viridis
 
-        primary_dets = [(i, d) for i, d in enumerate(r["detectors"])
-                        if abs(d.get("angle_deg", 0)) < 1 and i < data.shape[0]]
-
-        sds_vals = [d["sds_mm"] for _, d in primary_dets]
+        primary = [(i, d) for i, d in enumerate(r["detectors"])
+                    if abs(d.get("angle_deg", 0)) < 1 and i < data.shape[0]]
+        sds_vals = [d["sds_mm"] for _, d in primary]
         sds_min, sds_max = min(sds_vals), max(sds_vals)
 
-        for idx, det in primary_dets:
+        for idx, det in primary:
             t = data[idx]
             if t.sum() <= 0:
                 continue
             normed = t / t.max()
             frac = (det["sds_mm"] - sds_min) / (sds_max - sds_min + 1e-9)
             ax.plot(time_ns, normed, color=cmap(frac), linewidth=1.5,
-                    label=f"SDS={det['sds_mm']:.0f} mm")
+                    label=f"SDS={det['sds_mm']:.0f}mm")
+
+        # Shade the late gates (where amygdala sensitivity lives)
+        for edge in gate_edges_ns:
+            ax.axvline(edge, color='gray', linewidth=0.5, alpha=0.3)
+        ax.axvspan(2.0, 5.0, alpha=0.08, color='red', label='Amygdala-sensitive gates')
 
         ax.set_xlabel("Time of Flight [ns]")
         ax.set_ylabel("Normalized TPSF")
-        ax.set_title(f"TPSF — {wl_key} (primary direction)")
-        ax.set_xlim(0, 3.0)
-        ax.legend(fontsize=9)
+        ax.set_title(f"TPSF — {wl_key}")
+        ax.set_xlim(0, 5.5)
+        ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.savefig(output_dir / "tpsf_curves.png", dpi=150, bbox_inches="tight")
     plt.close()
-    print("  Saved tpsf_curves.png")
 
 
 # ---------------------------------------------------------------------------
-# 5. Time-gated sensitivity heatmap
+# 4. Time-gated sensitivity heatmap
 # ---------------------------------------------------------------------------
-def plot_time_gated_sensitivity(results, output_dir):
-    fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+def plot_sensitivity_heatmap(results, output_dir):
+    fig, axes = plt.subplots(1, 2, figsize=(18, 6))
 
     for ax, wl_key in zip(axes, ["760nm", "850nm"]):
         r = results[wl_key]
-        dets = [d for d in r["detectors"] if abs(d.get("angle_deg", 0)) < 1]
-        dets.sort(key=lambda d: d["sds_mm"])
+        dets = sorted(_primary_dets(results, wl_key), key=lambda d: d["sds_mm"])
 
         n_gates = len(GATE_LABELS)
         matrix = np.zeros((len(dets), n_gates))
@@ -318,497 +275,383 @@ def plot_time_gated_sensitivity(results, output_dir):
 
         im = ax.imshow(matrix, aspect="auto", cmap="YlOrRd", interpolation="nearest")
         ax.set_xticks(range(n_gates))
-        ax.set_xticklabels(GATE_LABELS, rotation=30, ha="right", fontsize=9)
+        ax.set_xticklabels(GATE_LABELS, rotation=45, ha="right", fontsize=8)
         ax.set_yticks(range(len(sds_labels)))
-        ax.set_yticklabels([f"SDS {s} mm" for s in sds_labels], fontsize=9)
+        ax.set_yticklabels([f"SDS {s}mm" for s in sds_labels], fontsize=9)
         ax.set_title(f"Amygdala Sensitivity [%] — {wl_key}")
 
         for i in range(matrix.shape[0]):
             for j in range(matrix.shape[1]):
                 val = matrix[i, j]
                 color = "white" if val > matrix.max() * 0.6 else "black"
-                ax.text(j, i, f"{val:.2f}", ha="center", va="center",
-                        fontsize=8, color=color)
+                ax.text(j, i, f"{val:.3f}" if val > 0 else "0",
+                        ha="center", va="center", fontsize=7, color=color)
 
         fig.colorbar(im, ax=ax, label="Sensitivity [%]", shrink=0.8)
 
-    fig.suptitle("Time-Gated Amygdala Sensitivity (primary direction)", fontsize=14, y=1.01)
+    fig.suptitle("TD-Gated Amygdala Sensitivity (fine gates, primary direction)", fontsize=14, y=1.01)
     plt.tight_layout()
-    plt.savefig(output_dir / "time_gated_sensitivity.png", dpi=150, bbox_inches="tight")
+    plt.savefig(output_dir / "td_sensitivity_heatmap.png", dpi=150, bbox_inches="tight")
     plt.close()
-    print("  Saved time_gated_sensitivity.png")
 
 
 # ---------------------------------------------------------------------------
-# 6. Photon counts per gate
+# 5. Gate photon counts
 # ---------------------------------------------------------------------------
-def plot_gate_photon_counts(results, output_dir):
-    fig, axes = plt.subplots(1, 2, figsize=(16, 5.5))
+def plot_gate_counts(results, output_dir):
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
     for ax, wl_key in zip(axes, ["760nm", "850nm"]):
-        r = results[wl_key]
-        dets = [d for d in r["detectors"] if abs(d.get("angle_deg", 0)) < 1]
-        dets.sort(key=lambda d: d["sds_mm"])
-
+        dets = sorted(_primary_dets(results, wl_key), key=lambda d: d["sds_mm"])
         sds_vals = [d["sds_mm"] for d in dets]
         colors = plt.cm.tab10(np.linspace(0, 1, len(GATE_LABELS)))
 
         x = np.arange(len(dets))
-        width = 0.13
+        width = 0.08
         for g_idx in range(len(GATE_LABELS)):
             counts = []
             for det in dets:
                 gates = det.get("time_gates", [])
                 cnt = gates[g_idx]["detected_photons"] if g_idx < len(gates) else 0
-                counts.append(cnt)
+                counts.append(max(cnt, 0.5))  # avoid log(0)
             ax.bar(x + g_idx * width, counts, width, label=GATE_LABELS[g_idx],
                    color=colors[g_idx])
 
         ax.set_yscale("log")
-        ax.set_xticks(x + width * 2.5)
-        ax.set_xticklabels([f"{s:.0f}" for s in sds_vals])
+        ax.set_xticks(x + width * 4.5)
+        ax.set_xticklabels([f"{s:.0f}" for s in sds_vals], fontsize=8)
         ax.set_xlabel("SDS [mm]")
         ax.set_ylabel("Detected Photons")
-        ax.set_title(f"Photons per Time Gate — {wl_key}")
-        ax.legend(fontsize=8, ncol=2)
+        ax.set_title(f"Photons per Gate — {wl_key}")
+        ax.legend(fontsize=6, ncol=2)
         ax.grid(True, alpha=0.3, axis="y")
 
     plt.tight_layout()
     plt.savefig(output_dir / "gate_photon_counts.png", dpi=150, bbox_inches="tight")
     plt.close()
-    print("  Saved gate_photon_counts.png")
 
 
 # ---------------------------------------------------------------------------
-# 7. Frequency-domain phase & amplitude
+# 6. TD-gated SNR @ 120s
 # ---------------------------------------------------------------------------
-def plot_fd_analysis(results, tpsf, output_dir):
-    if "760nm" not in tpsf:
-        return
-
-    bin_ps = 10.0
-    dt_s = bin_ps * 1e-12
-    n_fft = 32768
-    freqs_hz = np.fft.rfftfreq(n_fft, d=dt_s)
-    freqs_mhz = freqs_hz / 1e6
-
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
-    cmap = plt.cm.viridis
-
-    for wl_key, ls in [("760nm", "-"), ("850nm", "--")]:
-        if wl_key not in tpsf:
-            continue
-        r = results[wl_key]
-        data = tpsf[wl_key]
-
-        primary = [(i, d) for i, d in enumerate(r["detectors"])
-                   if abs(d.get("angle_deg", 0)) < 1 and i < data.shape[0]]
-        sds_vals = [d["sds_mm"] for _, d in primary]
-        sds_min, sds_max = min(sds_vals), max(sds_vals)
-
-        # Reference for differential phase
-        ref_H = None
-        for idx, det in primary:
-            if det["sds_mm"] < 10:
-                ref_H = np.fft.rfft(data[idx], n=n_fft)
-                break
-
-        for idx, det in primary:
-            t = data[idx]
-            if t.sum() <= 0:
-                continue
-            H = np.fft.rfft(t, n=n_fft)
-            phase_deg = np.angle(H) * 180 / np.pi
-            amp_db = 20 * np.log10(np.abs(H) / (np.abs(H[0]) + 1e-30) + 1e-30)
-
-            frac = (det["sds_mm"] - sds_min) / (sds_max - sds_min + 1e-9)
-            color = cmap(frac)
-            label = f"SDS={det['sds_mm']:.0f}" if wl_key == "760nm" else None
-
-            mask = (freqs_mhz > 1) & (freqs_mhz <= 600)
-            axes[0].plot(freqs_mhz[mask], phase_deg[mask], ls=ls, color=color,
-                         linewidth=1.2, label=label)
-            axes[1].plot(freqs_mhz[mask], amp_db[mask], ls=ls, color=color,
-                         linewidth=1.2, label=label)
-
-            if ref_H is not None:
-                dphase = (np.angle(H) - np.angle(ref_H)) * 180 / np.pi
-                axes[2].plot(freqs_mhz[mask], dphase[mask], ls=ls, color=color,
-                             linewidth=1.2, label=label)
-
-    axes[0].set_ylabel("Phase [deg]"); axes[0].set_title("Phase Shift")
-    axes[1].set_ylabel("|H(f)/H(0)| [dB]"); axes[1].set_title("Amplitude Attenuation")
-    axes[2].set_ylabel("Δφ vs SDS=8 mm [deg]"); axes[2].set_title("Differential Phase (depth encoding)")
-
-    for ax in axes:
-        ax.set_xlabel("Frequency [MHz]")
-        ax.set_xlim(0, 600)
-        ax.grid(True, alpha=0.3)
-
-    axes[0].legend(fontsize=8, ncol=2)
-    fig.suptitle("Frequency-Domain Analysis (solid = 760 nm, dashed = 850 nm)", fontsize=14, y=1.01)
-    plt.tight_layout()
-    plt.savefig(output_dir / "fd_phase_amplitude.png", dpi=150, bbox_inches="tight")
-    plt.close()
-    print("  Saved fd_phase_amplitude.png")
-
-
-# ---------------------------------------------------------------------------
-# 8. SNR comparison bar chart
-# ---------------------------------------------------------------------------
-def _compute_snr_data(results, tpsf):
-    """Compute SNR for CW, TD-gated, and chirp for primary-direction detectors."""
-    # Read laser power from results JSON (default 0.1 W = 100 mW)
-    laser_power = results.get("760nm", results.get("850nm", {})).get("laser_power_W", 0.1)
-    meas_time = 1.0
-    delta_hbo = 0.001    # 1 µM in mM
-    delta_hbr = -0.0003
-    tbp = 5.12e-9 * 495e6
-
-    wl_keys = ["760nm", "850nm"]
-    wl_m = [760e-9, 850e-9]
-    N_per_sec = [laser_power / (H_PLANCK * C_LIGHT / w) for w in wl_m]
-
-    det_data = {}
-    for wl_idx, wl_key in enumerate(wl_keys):
-        r = results[wl_key]
-        num_sim = r["num_photons"]
-        scale = N_per_sec[wl_idx] / num_sim
-
-        for det in r["detectors"]:
-            if abs(det.get("angle_deg", 0)) > 1:
-                continue
-            sds = det["sds_mm"]
-            if sds not in det_data:
-                det_data[sds] = {}
-
-            w = det["total_weight"]
-            amyg_pl = det["partial_pathlength_mm"]["amygdala"]
-            N_det = w * scale * meas_time
-
-            delta_od = (EPSILON_HBO[wl_idx] * delta_hbo +
-                        EPSILON_HBR[wl_idx] * delta_hbr) * amyg_pl
-            noise_cw = 1.0 / np.sqrt(N_det) if N_det > 0 else float('inf')
-            snr_cw = abs(delta_od) / noise_cw if noise_cw < float('inf') else 0
-
-            best_snr_td, best_gate = 0, -1
-            gates = det.get("time_gates", [])
-            for g_idx, gate in enumerate(gates):
-                gw = gate.get("weight", 0)
-                g_amyg = gate.get("partial_pathlength_mm", {}).get("amygdala", 0)
-                N_gate = gw * scale * meas_time
-                dod_g = (EPSILON_HBO[wl_idx] * delta_hbo +
-                         EPSILON_HBR[wl_idx] * delta_hbr) * g_amyg
-                noise_g = 1.0 / np.sqrt(N_gate) if N_gate > 0 else float('inf')
-                snr_g = abs(dod_g) / noise_g if noise_g < float('inf') else 0
-                if snr_g > best_snr_td:
-                    best_snr_td = snr_g
-                    best_gate = g_idx
-
-            snr_chirp = snr_cw * np.sqrt(tbp)
-
-            det_data[sds][wl_key] = dict(
-                snr_cw=snr_cw, snr_td=best_snr_td, snr_chirp=snr_chirp,
-                best_gate=best_gate, amyg_pl=amyg_pl, N_det=N_det,
-                noise_cw=noise_cw,
-            )
-
-    return det_data, tbp, laser_power
-
-
-def plot_snr_comparison(results, tpsf, output_dir):
-    det_data, tbp, laser_power = _compute_snr_data(results, tpsf)
-    sds_list = sorted(det_data.keys())
-
+def plot_td_snr(results, output_dir):
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-    for ax, wl_key, wl_label in zip(axes, ["760nm", "850nm"], ["760 nm", "850 nm"]):
-        x = np.arange(len(sds_list))
-        w = 0.25
-        cw_vals = [det_data[s].get(wl_key, {}).get("snr_cw", 0) for s in sds_list]
-        td_vals = [det_data[s].get(wl_key, {}).get("snr_td", 0) for s in sds_list]
-        ch_vals = [det_data[s].get(wl_key, {}).get("snr_chirp", 0) for s in sds_list]
+    for ax, wl_key, wl_idx in zip(axes, ["760nm", "850nm"], [0, 1]):
+        r = results[wl_key]
+        N_ps = _photons_per_sec(wl_idx)
+        num_sim = r["num_photons"]
+        scale = N_ps / num_sim
 
-        bars1 = ax.bar(x - w, cw_vals, w, label="CW", color="#42A5F5", edgecolor="black", linewidth=0.5)
-        bars2 = ax.bar(x, td_vals, w, label="TD-gated", color="#66BB6A", edgecolor="black", linewidth=0.5)
-        bars3 = ax.bar(x + w, ch_vals, w, label="Chirp-corr", color="#FFA726", edgecolor="black", linewidth=0.5)
+        dets = sorted(_primary_dets(results, wl_key), key=lambda d: d["sds_mm"])
+        sds_vals = [d["sds_mm"] for d in dets]
 
-        ax.axhline(1, color="red", linestyle="--", linewidth=1, label="SNR = 1")
-        ax.set_xticks(x)
-        ax.set_xticklabels([f"{s:.0f}" for s in sds_list])
+        # Compute best-gate SNR at each SDS
+        snr_vals = []
+        gate_used = []
+        for det in dets:
+            best_snr = 0
+            best_g = -1
+            for g_idx, gate in enumerate(det.get("time_gates", [])):
+                gw = gate.get("weight", 0)
+                amyg = gate.get("partial_pathlength_mm", {}).get("amygdala", 0)
+                N = gw * scale * MEAS_TIME * DET_EFF + DARK_RATE * MEAS_TIME
+                delta_od = abs((EPSILON_HBO[wl_idx]*0.001 + EPSILON_HBR[wl_idx]*(-0.0003)) * amyg)
+                snr = delta_od * np.sqrt(N) if N > 0 else 0
+                if snr > best_snr:
+                    best_snr = snr
+                    best_g = g_idx
+            snr_vals.append(best_snr)
+            gate_used.append(best_g)
+
+        colors = plt.cm.Set2(np.array(gate_used) / max(max(gate_used), 1))
+        bars = ax.bar(range(len(dets)), snr_vals, color=colors, edgecolor="black", linewidth=0.5)
+
+        # Label bars with gate name
+        for i, (bar, g) in enumerate(zip(bars, gate_used)):
+            if snr_vals[i] > 0 and g >= 0:
+                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
+                        GATE_LABELS[g], ha='center', va='bottom', fontsize=6, rotation=45)
+
+        ax.axhline(1.0, color="red", linestyle="--", linewidth=1.5, label="SNR=1")
+        ax.set_xticks(range(len(dets)))
+        ax.set_xticklabels([f"{s:.0f}" for s in sds_vals], fontsize=8)
         ax.set_xlabel("SDS [mm]")
-        ax.set_ylabel(f"SNR (1 µM ΔHbO, {laser_power*1e3:.0f} mW, 1 s)")
-        ax.set_title(f"SNR Comparison — {wl_label}")
+        ax.set_ylabel(f"SNR (1µM HbO, {MEAS_TIME:.0f}s)")
+        ax.set_title(f"TD-Gated SNR — {wl_key}")
         ax.set_yscale("log")
-        ax.legend(fontsize=9)
+        ax.legend()
         ax.grid(True, alpha=0.3, axis="y")
 
-    fig.suptitle("Modality Comparison: CW vs Time-Gated vs Chirp (primary direction)", fontsize=14, y=1.01)
+    fig.suptitle(f"TD-Gated Best-Gate SNR ({LASER_POWER*1e3:.0f}mW, {MEAS_TIME:.0f}s, {DET_EFF*100:.0f}% QE)",
+                 fontsize=14, y=1.01)
     plt.tight_layout()
-    plt.savefig(output_dir / "snr_comparison.png", dpi=150, bbox_inches="tight")
+    plt.savefig(output_dir / "td_snr_120s.png", dpi=150, bbox_inches="tight")
     plt.close()
-    print("  Saved snr_comparison.png")
 
 
 # ---------------------------------------------------------------------------
-# 9. Minimum detectable concentration
+# 7. Min detectable HbO/HbR (dual-wavelength)
 # ---------------------------------------------------------------------------
-def plot_min_detectable(results, tpsf, output_dir):
-    det_data, tbp, laser_power = _compute_snr_data(results, tpsf)
-    sds_list = sorted(det_data.keys())
+def plot_min_detectable(results, output_dir):
+    N_ps = [_photons_per_sec(i) for i in range(2)]
+    dets760 = sorted(_primary_dets(results, "760nm"), key=lambda d: d["sds_mm"])
+    dets850 = sorted(_primary_dets(results, "850nm"), key=lambda d: d["sds_mm"])
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-    titles = ["Min Detectable Δ[HbO] [µM]", "Min Detectable Δ[HbR] [µM]"]
+    sds_vals = []
+    min_hbo_vals = []
+    min_hbr_vals = []
 
-    for ax_idx, (ax, title) in enumerate(zip(axes, titles)):
-        cw_vals, td_vals, ch_vals = [], [], []
+    for d760, d850 in zip(dets760, dets850):
+        sds = d760["sds_mm"]
+        best_hbo = float('inf')
+        best_hbr = float('inf')
 
-        for sds in sds_list:
-            d760 = det_data[sds].get("760nm")
-            d850 = det_data[sds].get("850nm")
-            if not d760 or not d850:
-                cw_vals.append(np.nan); td_vals.append(np.nan); ch_vals.append(np.nan)
-                continue
-
-            L760, L850 = d760["amyg_pl"], d850["amyg_pl"]
+        n_gates = min(len(d760.get("time_gates", [])), len(d850.get("time_gates", [])))
+        for g_idx in range(n_gates):
+            g760, g850 = d760["time_gates"][g_idx], d850["time_gates"][g_idx]
+            L760 = g760.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            L850 = g850.get("partial_pathlength_mm", {}).get("amygdala", 0)
             if L760 <= 0 or L850 <= 0:
-                cw_vals.append(np.nan); td_vals.append(np.nan); ch_vals.append(np.nan)
                 continue
+
+            for wl_idx, (gate, r_key) in enumerate([(g760, "760nm"), (g850, "850nm")]):
+                gw = gate.get("weight", 0)
+                scale = N_ps[wl_idx] / results[r_key]["num_photons"]
+                N = gw * scale * MEAS_TIME * DET_EFF + DARK_RATE * MEAS_TIME
+                if wl_idx == 0:
+                    n760 = 1/np.sqrt(N) if N > 0 else float('inf')
+                else:
+                    n850 = 1/np.sqrt(N) if N > 0 else float('inf')
 
             E = np.array([[EPSILON_HBO[0]*L760, EPSILON_HBR[0]*L760],
                           [EPSILON_HBO[1]*L850, EPSILON_HBR[1]*L850]])
             if abs(np.linalg.det(E)) < 1e-20:
-                cw_vals.append(np.nan); td_vals.append(np.nan); ch_vals.append(np.nan)
                 continue
-            E_inv = np.linalg.inv(E)
+            dc = np.abs(np.linalg.inv(E) @ np.array([n760, n850])) * 1e3
+            if dc[0] < best_hbo:
+                best_hbo, best_hbr = dc[0], dc[1]
 
-            dOD_cw = np.array([d760["noise_cw"], d850["noise_cw"]])
-            dc_cw = np.abs(E_inv @ dOD_cw) * 1e3  # µM
+        sds_vals.append(sds)
+        min_hbo_vals.append(best_hbo if best_hbo < 1e6 else np.nan)
+        min_hbr_vals.append(best_hbr if best_hbr < 1e6 else np.nan)
 
-            # Chirp
-            dc_chirp = np.abs(E_inv @ (dOD_cw / np.sqrt(tbp))) * 1e3
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    x = np.arange(len(sds_vals))
 
-            # TD: approximate using same noise model
-            # We use the gate-level improvement factor
-            td_factor = max(d760["snr_td"] / (d760["snr_cw"] + 1e-30),
-                            d850["snr_td"] / (d850["snr_cw"] + 1e-30), 1.0)
-            dc_td = dc_cw / td_factor
-
-            cw_vals.append(dc_cw[ax_idx])
-            td_vals.append(dc_td[ax_idx])
-            ch_vals.append(dc_chirp[ax_idx])
-
-        x = np.arange(len(sds_list))
-        w = 0.25
-        ax.bar(x - w, cw_vals, w, label="CW", color="#42A5F5", edgecolor="black", linewidth=0.5)
-        ax.bar(x, td_vals, w, label="TD-gated", color="#66BB6A", edgecolor="black", linewidth=0.5)
-        ax.bar(x + w, ch_vals, w, label="Chirp-corr", color="#FFA726", edgecolor="black", linewidth=0.5)
-
-        ax.axhline(1.0, color="red", linestyle="--", linewidth=1, label="1 µM target")
+    for ax, vals, title, target in zip(axes,
+            [min_hbo_vals, min_hbr_vals],
+            ["Min Detectable ΔHbO [µM]", "Min Detectable ΔHbR [µM]"],
+            [1.0, 1.0]):
+        colors = ['#66BB6A' if v < target else '#FFA726' if v < target*5 else '#EF5350'
+                   for v in vals]
+        ax.bar(x, vals, color=colors, edgecolor="black", linewidth=0.5)
+        ax.axhline(target, color="red", linestyle="--", linewidth=1.5, label=f"{target} µM target")
         ax.set_xticks(x)
-        ax.set_xticklabels([f"{s:.0f}" for s in sds_list])
+        ax.set_xticklabels([f"{s:.0f}" for s in sds_vals], fontsize=8)
         ax.set_xlabel("SDS [mm]")
         ax.set_ylabel("Concentration [µM]")
         ax.set_title(title)
         ax.set_yscale("log")
-        ax.legend(fontsize=9)
+        ax.legend()
         ax.grid(True, alpha=0.3, axis="y")
 
-    fig.suptitle(f"Minimum Detectable Hemoglobin Change (MBLL, dual-λ, {laser_power*1e3:.0f} mW, 1 s)", fontsize=14, y=1.01)
+    fig.suptitle(f"Dual-λ MBLL Min Detectable (TD-gated, {MEAS_TIME:.0f}s, {DET_EFF*100:.0f}% QE)",
+                 fontsize=14, y=1.01)
     plt.tight_layout()
-    plt.savefig(output_dir / "min_detectable_concentration.png", dpi=150, bbox_inches="tight")
+    plt.savefig(output_dir / "min_detectable_td.png", dpi=150, bbox_inches="tight")
     plt.close()
-    print("  Saved min_detectable_concentration.png")
 
 
 # ---------------------------------------------------------------------------
-# 10. Amygdala pathlength by angle (polar-ish plot)
+# 8. Integration time curve
 # ---------------------------------------------------------------------------
-def plot_angular_sensitivity(results, output_dir):
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+def plot_integration_curve(results, output_dir):
+    N_ps = [_photons_per_sec(i) for i in range(2)]
+    dets760 = sorted(_primary_dets(results, "760nm"), key=lambda d: d["sds_mm"])
+    dets850 = sorted(_primary_dets(results, "850nm"), key=lambda d: d["sds_mm"])
 
-    for ax, wl_key in zip(axes, ["760nm", "850nm"]):
-        groups = _get_dets_by_angle(results, wl_key)
+    times = np.logspace(0, 3, 100)  # 1s to 1000s
 
-        for ang, dets in sorted(groups.items()):
-            sds = [d["sds_mm"] for d in dets]
-            amyg_pl = [d["partial_pathlength_mm"]["amygdala"] for d in dets]
-            color = ANGLE_COLORS.get(ang, "gray")
-            marker = ANGLE_MARKERS.get(ang, "x")
-            ax.plot(sds, amyg_pl, marker=marker, color=color, linewidth=1.5,
-                    markersize=7, label=f"{ang:+d}°")
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    cmap = plt.cm.viridis
 
-        ax.set_xlabel("SDS [mm]")
-        ax.set_ylabel("Amygdala Partial Pathlength [mm]")
-        ax.set_title(f"Amygdala PL by Direction — {wl_key}")
-        ax.legend(fontsize=9, title="Direction")
-        ax.grid(True, alpha=0.3)
+    sds_all = [d["sds_mm"] for d in dets760]
+    sds_min, sds_max = min(sds_all), max(sds_all)
 
-    fig.suptitle("Angular Dependence of Amygdala Sensitivity", fontsize=14, y=1.01)
+    for d760, d850 in zip(dets760, dets850):
+        sds = d760["sds_mm"]
+
+        # Find best gate min_hbo at 1s
+        best_min_1s = float('inf')
+        n_gates = min(len(d760.get("time_gates", [])), len(d850.get("time_gates", [])))
+        for g_idx in range(n_gates):
+            g760, g850 = d760["time_gates"][g_idx], d850["time_gates"][g_idx]
+            L760 = g760.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            L850 = g850.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            if L760 <= 0 or L850 <= 0:
+                continue
+            for wl_idx, (gate, r_key) in enumerate([(g760, "760nm"), (g850, "850nm")]):
+                gw = gate.get("weight", 0)
+                scale = N_ps[wl_idx] / results[r_key]["num_photons"]
+                N = gw * scale * 1.0 * DET_EFF + DARK_RATE
+                if wl_idx == 0:
+                    n760 = 1/np.sqrt(N) if N > 0 else float('inf')
+                else:
+                    n850 = 1/np.sqrt(N) if N > 0 else float('inf')
+            E = np.array([[EPSILON_HBO[0]*L760, EPSILON_HBR[0]*L760],
+                          [EPSILON_HBO[1]*L850, EPSILON_HBR[1]*L850]])
+            if abs(np.linalg.det(E)) < 1e-20:
+                continue
+            dc = np.abs(np.linalg.inv(E) @ np.array([n760, n850])) * 1e3
+            if dc[0] < best_min_1s:
+                best_min_1s = dc[0]
+
+        if best_min_1s > 1e5:
+            continue
+
+        curve = best_min_1s / np.sqrt(times)
+        frac = (sds - sds_min) / (sds_max - sds_min + 1e-9)
+        ax.plot(times, curve, color=cmap(frac), linewidth=1.5,
+                label=f"SDS={sds:.0f}mm")
+
+    ax.axhline(1.0, color="red", linestyle="--", linewidth=1.5, label="1 µM target")
+    ax.axhline(2.0, color="orange", linestyle=":", linewidth=1, label="2 µM (block avg)")
+    ax.axvline(120, color="gray", linestyle="--", alpha=0.5, label="2 min")
+    ax.axvline(15, color="gray", linestyle=":", alpha=0.5, label="15s (1 trial)")
+
+    ax.set_xlabel("Integration Time [s]")
+    ax.set_ylabel("Min Detectable ΔHbO [µM]")
+    ax.set_title("Integration Time vs Sensitivity (dual-λ TD-gated MBLL)")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(1, 1000)
+    ax.set_ylim(0.01, 100)
+    ax.legend(fontsize=8, ncol=2)
+    ax.grid(True, alpha=0.3)
+
     plt.tight_layout()
-    plt.savefig(output_dir / "angular_sensitivity.png", dpi=150, bbox_inches="tight")
+    plt.savefig(output_dir / "integration_time_curve.png", dpi=150, bbox_inches="tight")
     plt.close()
-    print("  Saved angular_sensitivity.png")
 
 
 # ---------------------------------------------------------------------------
-# 11. Photon paths — sagittal "banana" view
+# 9. Block design expected signal
+# ---------------------------------------------------------------------------
+def plot_block_design(results, output_dir):
+    N_ps = [_photons_per_sec(i) for i in range(2)]
+    dets760 = sorted(_primary_dets(results, "760nm"), key=lambda d: d["sds_mm"])
+    dets850 = sorted(_primary_dets(results, "850nm"), key=lambda d: d["sds_mm"])
+
+    # Find best SDS
+    best_sds_min = float('inf')
+    best_sds = 0
+    for d760, d850 in zip(dets760, dets850):
+        n_gates = min(len(d760.get("time_gates", [])), len(d850.get("time_gates", [])))
+        for g_idx in range(n_gates):
+            g760, g850 = d760["time_gates"][g_idx], d850["time_gates"][g_idx]
+            L760 = g760.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            L850 = g850.get("partial_pathlength_mm", {}).get("amygdala", 0)
+            if L760 <= 0 or L850 <= 0:
+                continue
+            for wl_idx, (gate, r_key) in enumerate([(g760, "760nm"), (g850, "850nm")]):
+                gw = gate.get("weight", 0)
+                scale = N_ps[wl_idx] / results[r_key]["num_photons"]
+                N = gw * scale * MEAS_TIME * DET_EFF + DARK_RATE * MEAS_TIME
+                if wl_idx == 0:
+                    n760 = 1/np.sqrt(N) if N > 0 else float('inf')
+                else:
+                    n850 = 1/np.sqrt(N) if N > 0 else float('inf')
+            E = np.array([[EPSILON_HBO[0]*L760, EPSILON_HBR[0]*L760],
+                          [EPSILON_HBO[1]*L850, EPSILON_HBR[1]*L850]])
+            if abs(np.linalg.det(E)) < 1e-20:
+                continue
+            dc = np.abs(np.linalg.inv(E) @ np.array([n760, n850])) * 1e3
+            if dc[0] < best_sds_min:
+                best_sds_min = dc[0]
+                best_sds = d760["sds_mm"]
+
+    # Simulate block design time course
+    dt = 0.5  # 500ms sampling
+    n_trials = 20
+    trial_on = 15.0
+    trial_off = 15.0
+    trial_dur = trial_on + trial_off
+    total_time = n_trials * trial_dur
+
+    t = np.arange(0, total_time, dt)
+    hbo_true = np.zeros_like(t)
+    hbr_true = np.zeros_like(t)
+
+    # HRF-like response (gamma function approximation)
+    for trial in range(n_trials):
+        onset = trial * trial_dur
+        for i, ti in enumerate(t):
+            rel = ti - onset
+            if 0 < rel < trial_on + 10:
+                # Simple gamma HRF: peaks at ~5s
+                if rel < trial_on:
+                    hrf = 3.0 * (rel / 5.0) * np.exp(-(rel - 5.0) / 3.0)
+                else:
+                    decay_t = rel - trial_on
+                    peak_val = 3.0 * (trial_on / 5.0) * np.exp(-(trial_on - 5.0) / 3.0)
+                    hrf = peak_val * np.exp(-decay_t / 4.0)
+                hbo_true[i] += hrf
+                hbr_true[i] -= hrf * 0.3
+
+    # Add noise based on best configuration noise floor
+    noise_std_hbo = best_sds_min / np.sqrt(dt) if best_sds_min < 1e5 else 10
+    noise_std_hbr = noise_std_hbo * 3  # HbR is noisier
+
+    np.random.seed(42)
+    hbo_meas = hbo_true + np.random.normal(0, noise_std_hbo, len(t))
+    hbr_meas = hbr_true + np.random.normal(0, noise_std_hbr, len(t))
+
+    fig, axes = plt.subplots(2, 1, figsize=(16, 8), sharex=True)
+
+    axes[0].plot(t, hbo_true, 'r-', linewidth=2, label='True HbO', alpha=0.8)
+    axes[0].plot(t, hbo_meas, 'r-', linewidth=0.3, alpha=0.3, label='Measured')
+    # Running average
+    win = int(15.0 / dt)
+    if len(hbo_meas) > win:
+        hbo_smooth = np.convolve(hbo_meas, np.ones(win)/win, mode='same')
+        axes[0].plot(t, hbo_smooth, 'darkred', linewidth=1.5, label='15s moving avg')
+    axes[0].set_ylabel("ΔHbO [µM]")
+    axes[0].set_title(f"Block Design: {n_trials} trials × ({trial_on:.0f}s on / {trial_off:.0f}s off) "
+                      f"— SDS={best_sds:.0f}mm TD-gated")
+    axes[0].legend(fontsize=9)
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(t, hbr_true, 'b-', linewidth=2, label='True HbR', alpha=0.8)
+    axes[1].plot(t, hbr_meas, 'b-', linewidth=0.3, alpha=0.3, label='Measured')
+    if len(hbr_meas) > win:
+        hbr_smooth = np.convolve(hbr_meas, np.ones(win)/win, mode='same')
+        axes[1].plot(t, hbr_smooth, 'darkblue', linewidth=1.5, label='15s moving avg')
+    axes[1].set_ylabel("ΔHbR [µM]")
+    axes[1].set_xlabel("Time [s]")
+    axes[1].legend(fontsize=9)
+    axes[1].grid(True, alpha=0.3)
+
+    # Shade stimulus periods
+    for trial in range(n_trials):
+        onset = trial * trial_dur
+        for ax in axes:
+            ax.axvspan(onset, onset + trial_on, alpha=0.05, color='yellow')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / "block_design_signal.png", dpi=150, bbox_inches="tight")
+    plt.close()
+
+
+# ---------------------------------------------------------------------------
+# 10. Photon paths
 # ---------------------------------------------------------------------------
 def _ellipsoid_boundary(cx, cy, a, b, n=100):
-    """Return (x, y) for ellipse outline."""
     t = np.linspace(0, 2 * np.pi, n)
     return cx + a * np.cos(t), cy + b * np.sin(t)
 
 
-def _tissue_at_point(x, y, z, meta):
-    """Approximate tissue type from ellipsoidal head model (mm coords from center).
-    Semi-axes must match geometry.cu default_head_model()."""
-    cx = meta["nx"] * meta["dx"] / 2
-    cy = meta["ny"] * meta["dx"] / 2
-    cz = meta["nz"] * meta["dx"] / 2
-    # Ellipsoidal scalp: (78, 95, 85) mm semi-axes
-    rx, ry, rz = (x - cx) / 78, (y - cy) / 95, (z - cz) / 85
-    r = np.sqrt(rx**2 + ry**2 + rz**2)
-    if r > 1.0:
-        return 0  # air
-    # Check amygdala (right)
-    ax, ay, az = (x - cx - 24) / 5, (y - cy + 2) / 9, (z - cz + 18) / 6
-    if ax**2 + ay**2 + az**2 <= 1.0:
-        return 6
-    # Check amygdala (left)
-    ax2 = (x - cx + 24) / 5
-    if ax2**2 + ay**2 + az**2 <= 1.0:
-        return 6
-    r_sk = np.sqrt(((x-cx)/74)**2 + ((y-cy)/91)**2 + ((z-cz)/81)**2)
-    if r_sk > 1.0:
-        return 1  # scalp
-    r_csf = np.sqrt(((x-cx)/67)**2 + ((y-cy)/84)**2 + ((z-cz)/74)**2)
-    if r_csf > 1.0:
-        return 2  # skull
-    r_gm = np.sqrt(((x-cx)/65.5)**2 + ((y-cy)/82.5)**2 + ((z-cz)/72.5)**2)
-    if r_gm > 1.0:
-        return 3  # CSF
-    r_wm = np.sqrt(((x-cx)/62)**2 + ((y-cy)/79)**2 + ((z-cz)/69)**2)
-    if r_wm > 1.0:
-        return 4  # gray matter
-    return 5  # white matter
-
-
 def plot_photon_paths(paths, results, meta, output_dir):
-    """Plot photon paths in sagittal view through the right amygdala."""
-    dx = meta["dx"]
-    cx = meta["nx"] * dx / 2  # center in mm
-    cy = meta["ny"] * dx / 2
-    cz = meta["nz"] * dx / 2
-
-    for wl_key in paths:
-        pdata = paths[wl_key]
-        det_ids = pdata["det_ids"]
-        path_lens = pdata["path_lens"]
-        positions = pdata["positions"]  # (N, MAX_STEPS, 3)
-        n_paths = len(det_ids)
-
-        if n_paths == 0:
-            continue
-
-        fig, axes = plt.subplots(1, 2, figsize=(18, 8))
-
-        # --- Left: Sagittal view (X=const through R amygdala) ---
-        ax = axes[0]
-        # Draw tissue boundaries (sagittal = Y-Z plane); semi-axes: (Y, Z)
-        for (sa_y, sa_z), color, label in [
-            ((95, 85), "#D2B48C", "Scalp"), ((91, 81), "#DEB887", "Skull"),
-            ((84, 74), "#87CEEB", "CSF"), ((82.5, 72.5), "#CD5C5C", "Gray"),
-            ((79, 69), "#F5F5DC", "White")
-        ]:
-            ey, ez = _ellipsoid_boundary(cy, cz, sa_y, sa_z)
-            ax.plot(ey, ez, color=color, linewidth=1.0, alpha=0.5)
-
-        # Right amygdala ellipse in sagittal view (center: cy-2, cz-18)
-        ay, az = _ellipsoid_boundary(cy - 2, cz - 18, 9, 6)
-        ax.fill(ay, az, color=TISSUE_COLORS[6], alpha=0.3, label="Amygdala")
-        ax.plot(ay, az, color="red", linewidth=1.5)
-
-        # Plot paths (subsample if too many)
-        max_show = min(200, n_paths)
-        indices = np.random.default_rng(42).choice(n_paths, max_show, replace=False) if n_paths > max_show else np.arange(n_paths)
-
-        amyg_count = 0
-        for idx in indices:
-            nsteps = path_lens[idx]
-            pts = positions[idx, :nsteps, :]  # (nsteps, 3) = x, y, z in mm
-
-            # Color by whether path passed near amygdala
-            # Check if any point is inside R amygdala ellipsoid
-            ax_r = (pts[:, 0] - cx - 24) / 5
-            ay_r = (pts[:, 1] - cy + 2) / 9
-            az_r = (pts[:, 2] - cz + 18) / 6
-            in_amyg = np.any(ax_r**2 + ay_r**2 + az_r**2 <= 1.0)
-
-            if in_amyg:
-                ax.plot(pts[:, 1], pts[:, 2], color="red", alpha=0.4, linewidth=0.8)
-                amyg_count += 1
-            else:
-                ax.plot(pts[:, 1], pts[:, 2], color="blue", alpha=0.1, linewidth=0.3)
-
-        ax.set_xlim(cy - 100, cy + 100)
-        ax.set_ylim(cz + 90, cz - 90)  # invert Z so surface is on top
-        ax.set_xlabel("Y [mm] (anterior-posterior)")
-        ax.set_ylabel("Z [mm] (inferior-superior)")
-        ax.set_title(f"Sagittal Photon Paths — {wl_key}\n"
-                      f"({max_show} paths shown, {amyg_count} reach amygdala)")
-        ax.set_aspect("equal")
-        ax.legend(fontsize=9, loc="lower right")
-
-        # --- Right: Coronal view (Y=const) ---
-        ax2 = axes[1]
-        # Coronal semi-axes: (X, Z) = (ML, SI)
-        for (sa_x, sa_z), color, label in [
-            ((78, 85), "#D2B48C", "Scalp"), ((74, 81), "#DEB887", "Skull"),
-            ((67, 74), "#87CEEB", "CSF"), ((65.5, 72.5), "#CD5C5C", "Gray"),
-            ((62, 69), "#F5F5DC", "White")
-        ]:
-            ex, ez = _ellipsoid_boundary(cx, cz, sa_x, sa_z)
-            ax2.plot(ex, ez, color=color, linewidth=1.0, alpha=0.5)
-
-        # Both amygdalae in coronal view (center: cx±24, cz-18)
-        for amyg_cx_off in [-24, 24]:
-            aex, aez = _ellipsoid_boundary(cx + amyg_cx_off, cz - 18, 5, 6)
-            ax2.fill(aex, aez, color=TISSUE_COLORS[6], alpha=0.3)
-            ax2.plot(aex, aez, color="red", linewidth=1.5)
-
-        for idx in indices:
-            nsteps = path_lens[idx]
-            pts = positions[idx, :nsteps, :]
-            ax_r = (pts[:, 0] - cx - 24) / 5
-            ay_r = (pts[:, 1] - cy + 2) / 9
-            az_r = (pts[:, 2] - cz + 18) / 6
-            in_amyg = np.any(ax_r**2 + ay_r**2 + az_r**2 <= 1.0)
-            if in_amyg:
-                ax2.plot(pts[:, 0], pts[:, 2], color="red", alpha=0.4, linewidth=0.8)
-            else:
-                ax2.plot(pts[:, 0], pts[:, 2], color="blue", alpha=0.1, linewidth=0.3)
-
-        ax2.set_xlim(cx - 85, cx + 85)
-        ax2.set_ylim(cz + 90, cz - 90)
-        ax2.set_xlabel("X [mm] (left-right)")
-        ax2.set_ylabel("Z [mm] (inferior-superior)")
-        ax2.set_title(f"Coronal Photon Paths — {wl_key}")
-        ax2.set_aspect("equal")
-
-        fig.suptitle(f"Photon Trajectories — {wl_key} (red = passes through amygdala)",
-                     fontsize=14, y=1.01)
-        plt.tight_layout()
-        plt.savefig(output_dir / f"photon_paths_{wl_key}.png", dpi=150, bbox_inches="tight")
-        plt.close()
-        print(f"  Saved photon_paths_{wl_key}.png")
-
-
-# ---------------------------------------------------------------------------
-# 12. Photon paths grouped by detector
-# ---------------------------------------------------------------------------
-def plot_photon_paths_by_detector(paths, results, meta, output_dir):
-    """Plot photon paths for selected detectors showing banana shapes at different SDS."""
     dx = meta["dx"]
     cx = meta["nx"] * dx / 2
     cy = meta["ny"] * dx / 2
@@ -819,100 +662,75 @@ def plot_photon_paths_by_detector(paths, results, meta, output_dir):
         det_ids = pdata["det_ids"]
         path_lens = pdata["path_lens"]
         positions = pdata["positions"]
-
-        if len(det_ids) == 0:
+        n_paths = len(det_ids)
+        if n_paths == 0:
             continue
 
-        # Get unique detector IDs that have paths
-        unique_dets = np.unique(det_ids)
-        # Pick up to 6 detectors with most paths, spread across SDS
-        det_counts = {d: np.sum(det_ids == d) for d in unique_dets}
-        # Sort by ID (roughly by SDS since placed in order)
-        sorted_dets = sorted(unique_dets)
-        # Select evenly spaced subset
-        if len(sorted_dets) > 6:
-            step = len(sorted_dets) / 6
-            selected = [sorted_dets[int(i * step)] for i in range(6)]
-        else:
-            selected = sorted_dets
+        fig, axes = plt.subplots(1, 2, figsize=(18, 8))
 
-        n_sel = len(selected)
-        if n_sel == 0:
-            continue
-
-        cols = min(3, n_sel)
-        rows = (n_sel + cols - 1) // cols
-        fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 6 * rows),
-                                 squeeze=False)
-
-        # Get detector info from results
-        det_info = {}
-        if wl_key in results:
-            for d in results[wl_key].get("detectors", []):
-                det_info[d.get("id", -1)] = d
-
-        for ax_i, det_id in enumerate(selected):
-            ax = axes[ax_i // cols][ax_i % cols]
-
-            # Draw tissue boundaries (sagittal, Y-Z semi-axes)
+        for ax_idx, (ax, view) in enumerate(zip(axes, ["sagittal", "coronal"])):
             for (sa_y, sa_z), color in [
                 ((95, 85), "#D2B48C"), ((91, 81), "#DEB887"), ((84, 74), "#87CEEB"),
                 ((82.5, 72.5), "#CD5C5C"), ((79, 69), "#F5F5DC")
             ]:
-                ey, ez = _ellipsoid_boundary(cy, cz, sa_y, sa_z)
-                ax.plot(ey, ez, color=color, linewidth=0.8, alpha=0.4)
+                if view == "sagittal":
+                    ey, ez = _ellipsoid_boundary(cy, cz, sa_y, sa_z)
+                else:
+                    ey, ez = _ellipsoid_boundary(cx, cz, sa_y if view == "sagittal" else 78 * sa_y / 95, sa_z)
+                ax.plot(ey, ez, color=color, linewidth=1.0, alpha=0.5)
 
-            aey, aez = _ellipsoid_boundary(cy - 2, cz - 18, 9, 6)
-            ax.fill(aey, aez, color=TISSUE_COLORS[6], alpha=0.3)
-            ax.plot(aey, aez, color="red", linewidth=1.0)
+            if view == "sagittal":
+                aey, aez = _ellipsoid_boundary(cy - 2, cz - 18, 9, 6)
+                ax.fill(aey, aez, color=TISSUE_COLORS[6], alpha=0.3, label="Amygdala")
+                ax.plot(aey, aez, color="red", linewidth=1.5)
+            else:
+                for off in [-24, 24]:
+                    aex, aez = _ellipsoid_boundary(cx + off, cz - 18, 5, 6)
+                    ax.fill(aex, aez, color=TISSUE_COLORS[6], alpha=0.3)
+                    ax.plot(aex, aez, color="red", linewidth=1.5)
 
-            mask = det_ids == det_id
-            det_paths = positions[mask]
-            det_plens = path_lens[mask]
-            n = len(det_paths)
+            max_show = min(200, n_paths)
+            indices = np.random.default_rng(42).choice(n_paths, max_show, replace=False) if n_paths > max_show else np.arange(n_paths)
 
-            max_show = min(50, n)
-            rng = np.random.default_rng(det_id)
-            idxs = rng.choice(n, max_show, replace=False) if n > max_show else np.arange(n)
+            amyg_count = 0
+            for idx in indices:
+                nsteps = path_lens[idx]
+                pts = positions[idx, :nsteps, :]
+                ax_r = (pts[:, 0] - cx - 24) / 5
+                ay_r = (pts[:, 1] - cy + 2) / 9
+                az_r = (pts[:, 2] - cz + 18) / 6
+                in_amyg = np.any(ax_r**2 + ay_r**2 + az_r**2 <= 1.0)
 
-            for idx in idxs:
-                nsteps = det_plens[idx]
-                pts = det_paths[idx, :nsteps, :]
+                if view == "sagittal":
+                    px, py = pts[:, 1], pts[:, 2]
+                else:
+                    px, py = pts[:, 0], pts[:, 2]
 
-                # Color by depth reached
-                max_depth = (cz - pts[:, 2].min())  # how far below surface center
-                depth_frac = np.clip(max_depth / 40, 0, 1)
-                color = plt.cm.plasma(depth_frac)
-                ax.plot(pts[:, 1], pts[:, 2], color=color, alpha=0.5, linewidth=0.6)
+                if in_amyg:
+                    ax.plot(px, py, color="red", alpha=0.4, linewidth=0.8)
+                    amyg_count += 1
+                else:
+                    ax.plot(px, py, color="blue", alpha=0.1, linewidth=0.3)
 
-            info = det_info.get(det_id, {})
-            sds = info.get("sds_mm", "?")
-            angle = info.get("angle_deg", "?")
-            ax.set_title(f"Det {det_id}: SDS={sds} mm, {angle}°\n({n} paths total)")
-            ax.set_xlim(cy - 100, cy + 100)
+            lim_c = cy if view == "sagittal" else cx
+            ax.set_xlim(lim_c - 100, lim_c + 100)
             ax.set_ylim(cz + 90, cz - 90)
-            ax.set_xlabel("Y [mm]")
+            ax.set_xlabel("Y [mm]" if view == "sagittal" else "X [mm]")
             ax.set_ylabel("Z [mm]")
+            title = "Sagittal" if view == "sagittal" else "Coronal"
+            ax.set_title(f"{title} — {wl_key} ({max_show} paths, {amyg_count} reach amygdala)")
             ax.set_aspect("equal")
 
-        # Hide empty subplots
-        for ax_i in range(n_sel, rows * cols):
-            axes[ax_i // cols][ax_i % cols].set_visible(False)
-
-        fig.suptitle(f"Photon Paths by Detector — {wl_key}\n(color = penetration depth)",
-                     fontsize=14, y=1.01)
         plt.tight_layout()
-        plt.savefig(output_dir / f"photon_paths_by_det_{wl_key}.png",
-                    dpi=150, bbox_inches="tight")
+        plt.savefig(output_dir / f"photon_paths_{wl_key}.png", dpi=150, bbox_inches="tight")
         plt.close()
-        print(f"  Saved photon_paths_by_det_{wl_key}.png")
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description="fNIRS MC TD/FD Visualization")
+    parser = argparse.ArgumentParser(description="fNIRS MC TD-Gated Visualization")
     parser.add_argument("--data-dir", type=str, default="../results")
     parser.add_argument("--output-dir", type=str, default="../figures")
     args = parser.parse_args()
@@ -923,36 +741,36 @@ def main():
 
     print("Loading data...")
     vol, fluence, results, tpsf, meta, paths = load_data(data_dir)
-    if vol is not None:
-        print(f"  Volume: {vol.shape}, Fluence: {list(fluence.keys())}")
-    else:
-        print(f"  Volume: skipped (large grid), Fluence: {list(fluence.keys())}")
+    print(f"  Volume: {'loaded' if vol is not None else 'skipped'}")
     print(f"  TPSF: {', '.join(f'{k}: {v.shape}' for k, v in tpsf.items())}")
-    path_summary = ", ".join(f"{k}: {v['det_ids'].shape[0]}" for k, v in paths.items())
-    print(f"  Paths: {path_summary}")
 
-    print("\nGenerating figures...")
+    print("\nGenerating TD-gated figures...")
     if vol is not None:
         plot_tissue_slices(vol, meta, output_dir)
+        print("  tissue_slices.png")
         plot_fluence(vol, fluence, meta, output_dir)
-    else:
-        print("  Skipping tissue_slices.png and fluence (no volume.bin)")
-    plot_cw_sensitivity(results, output_dir)
-    plot_angular_sensitivity(results, output_dir)
+        print("  fluence_*.png")
+
     plot_tpsf(results, tpsf, output_dir)
-    plot_time_gated_sensitivity(results, output_dir)
-    plot_gate_photon_counts(results, output_dir)
-    plot_fd_analysis(results, tpsf, output_dir)
-    plot_snr_comparison(results, tpsf, output_dir)
-    plot_min_detectable(results, tpsf, output_dir)
+    print("  tpsf_curves.png")
+    plot_sensitivity_heatmap(results, output_dir)
+    print("  td_sensitivity_heatmap.png")
+    plot_gate_counts(results, output_dir)
+    print("  gate_photon_counts.png")
+    plot_td_snr(results, output_dir)
+    print("  td_snr_120s.png")
+    plot_min_detectable(results, output_dir)
+    print("  min_detectable_td.png")
+    plot_integration_curve(results, output_dir)
+    print("  integration_time_curve.png")
+    plot_block_design(results, output_dir)
+    print("  block_design_signal.png")
+
     if paths:
         plot_photon_paths(paths, results, meta, output_dir)
-        plot_photon_paths_by_detector(paths, results, meta, output_dir)
-    else:
-        print("  Skipping photon path plots (no path data)")
+        print("  photon_paths_*.png")
 
-    n_figs = 10 + (2 if paths else 0) - (2 if vol is None else 0)
-    print(f"\nAll {n_figs} figures saved to {output_dir}/")
+    print("\nDone!")
 
 
 if __name__ == "__main__":

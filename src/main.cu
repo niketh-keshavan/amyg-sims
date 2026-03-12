@@ -46,14 +46,14 @@ static void save_results_json(
     fprintf(f, "  \"laser_power_W\": 0.1,\n");
     fprintf(f, "  \"tpsf_bins\": %d,\n", TPSF_BINS);
     fprintf(f, "  \"tpsf_bin_ps\": %.1f,\n", (double)TPSF_BIN_PS);
-    fprintf(f, "  \"time_gate_edges_ps\": [0, 500, 1000, 1500, 2500, 4000],\n");
+    fprintf(f, "  \"time_gate_edges_ps\": [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000],\n");
     fprintf(f, "  \"detectors\": [\n");
 
     const char* tissue_names[] = {
         "air", "scalp", "skull", "csf", "gray_matter", "white_matter", "amygdala"
     };
-    const float gate_lo[] = {0, 500, 1000, 1500, 2500, 4000};
-    const float gate_hi[] = {500, 1000, 1500, 2500, 4000, 100000};
+    const float gate_lo[] = {0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000};
+    const float gate_hi[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000, 100000};
 
     for (int d = 0; d < n_dets; d++) {
         fprintf(f, "    {\n");
