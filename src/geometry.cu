@@ -180,7 +180,7 @@ std::vector<uint8_t> build_head_volume(const HeadModelParams& p) {
 }
 
 // ---------------------------------------------------------------------------
-// Optical properties at 760 nm and 850 nm
+// Optical properties at 730 nm and 850 nm
 // ---------------------------------------------------------------------------
 // Values from literature (Strangman et al. 2003, Okada & Delpy 2003,
 // Jacques 2013, Sassaroli & Bhatt 2020)
@@ -193,14 +193,14 @@ std::vector<uint8_t> build_head_volume(const HeadModelParams& p) {
 // ---------------------------------------------------------------------------
 void get_optical_properties(int wavelength_idx, OpticalProps props[NUM_TISSUE_TYPES]) {
     if (wavelength_idx == 0) {
-        // 760 nm
+        // 730 nm  (higher scattering than 760 due to shorter wavelength)
         props[TISSUE_AIR]      = {0.0f,    0.0f,    1.0f, 1.000f};
-        props[TISSUE_SCALP]    = {0.0191f, 10.7f,   0.9f, 1.37f};  // mu_s'=1.07
-        props[TISSUE_SKULL]    = {0.0136f, 12.5f,   0.9f, 1.56f};  // mu_s'=1.25
+        props[TISSUE_SCALP]    = {0.0200f, 11.2f,   0.9f, 1.37f};  // mu_s'=1.12
+        props[TISSUE_SKULL]    = {0.0150f, 13.2f,   0.9f, 1.56f};  // mu_s'=1.32
         props[TISSUE_CSF]      = {0.0026f,  0.1f,   0.9f, 1.33f};  // nearly transparent
-        props[TISSUE_GRAY]     = {0.0186f, 11.0f,   0.9f, 1.37f};  // mu_s'=1.10
-        props[TISSUE_WHITE]    = {0.0167f, 13.8f,   0.9f, 1.37f};  // mu_s'=1.38
-        props[TISSUE_AMYGDALA] = {0.0200f, 11.0f,   0.9f, 1.37f};  // similar to GM, slightly higher mu_a
+        props[TISSUE_GRAY]     = {0.0190f, 11.5f,   0.9f, 1.37f};  // mu_s'=1.15
+        props[TISSUE_WHITE]    = {0.0170f, 14.4f,   0.9f, 1.37f};  // mu_s'=1.44
+        props[TISSUE_AMYGDALA] = {0.0210f, 11.5f,   0.9f, 1.37f};  // similar to GM
     } else {
         // 850 nm
         props[TISSUE_AIR]      = {0.0f,    0.0f,    1.0f, 1.000f};

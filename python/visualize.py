@@ -48,16 +48,17 @@ GATE_LABELS = [
     "2.5-3ns", "3-3.5ns", "3.5-4ns", "4-5ns", "5ns+"
 ]
 
-EPSILON_HBR = np.array([1.1058, 0.6918]) / 10.0
-EPSILON_HBO = np.array([0.1496, 1.0507]) / 10.0
+EPSILON_HBR = np.array([1.3080, 0.6918]) / 10.0
+EPSILON_HBO = np.array([0.1348, 1.0507]) / 10.0
 H_PLANCK = 6.626e-34
 C_LIGHT = 3e8
-WAVELENGTHS_M = np.array([760e-9, 850e-9])
+WAVELENGTHS_M = np.array([730e-9, 850e-9])
+WL_KEYS = ["730nm", "850nm"]
 
 # System parameters
-LASER_POWER = 0.1
+LASER_POWER = 0.4
 MEAS_TIME = 120.0
-DET_EFF = 0.10
+DET_QE = {"730nm": 0.30, "850nm": 0.15}  # Si-PMT
 DARK_RATE = 1000
 
 plt.rcParams.update({
