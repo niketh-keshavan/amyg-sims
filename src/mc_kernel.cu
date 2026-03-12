@@ -213,13 +213,38 @@ __global__ void mc_kernel(
     curand_init(seed_offset + tid, 0, 0, &rng);
 
     for (uint64_t p = 0; p < photons_per_thread; p++) {
-        // --- Launch photon ---
+        // --- Launch photon with beam spread ---
         float px = d_config.src_x;
         float py = d_config.src_y;
         float pz = d_config.src_z;
         float ddx = d_config.src_dx;
         float ddy = d_config.src_dy;
         float ddz = d_config.src_dz;
+
+        // Uniform disk sampling perpendicular to source direction
+        if (d_config.beam_radius > 0.0f) {
+            float r = d_config.beam_radius * sqrtf(curand_uniform(&rng));
+            float theta = 2.0f * 3.14159265f * curand_uniform(&rng);
+            // Build tangent vectors to source direction
+            float tx, ty, tz, bx, by, bz;
+            if (fabsf(ddz) < 0.9f) {
+                tx = ddy; ty = -ddx; tz = 0.0f;
+            } else {
+                tx = 0.0f; ty = ddz; tz = -ddy;
+            }
+            float tmag = rsqrtf(tx*tx + ty*ty + tz*tz);
+            tx *= tmag; ty *= tmag; tz *= tmag;
+            bx = ddy*tz - ddz*ty;
+            by = ddz*tx - ddx*tz;
+            bz = ddx*ty - ddy*tx;
+            float offset_x = r * (cosf(theta) * tx + sinf(theta) * bx);
+            float offset_y = r * (cosf(theta) * ty + sinf(theta) * by);
+            float offset_z = r * (cosf(theta) * tz + sinf(theta) * bz);
+            px += offset_x;
+            py += offset_y;
+            pz += offset_z;
+        }
+
         float weight = 1.0f;
 
         float ppl[NUM_TISSUE_TYPES];

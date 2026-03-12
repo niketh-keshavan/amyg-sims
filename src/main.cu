@@ -242,6 +242,8 @@ int main(int argc, char** argv) {
         config.src_dy = sy / smag;
         config.src_dz = sz / smag;
 
+        config.beam_radius = 3.5f;  // 7 mm beam diameter (diffusing tip optode)
+
         config.wavelength_idx = wl;
         get_optical_properties(wl, config.tissue);
 

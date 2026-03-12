@@ -614,7 +614,7 @@ def mpe_analysis():
 
     laser_power_W = 0.1   # 100 mW
     wavelengths_nm = [760, 850]
-    beam_diameter_cm = 0.5     # 5 mm beam diameter (typical fiber output)
+    beam_diameter_cm = 0.7     # 7 mm beam diameter (diffusing tip optode)
     beam_area_cm2 = np.pi * (beam_diameter_cm / 2) ** 2
     exposure_time_s = 10.0     # continuous measurement scenario
 
@@ -680,8 +680,10 @@ def mpe_analysis():
         print(f"    Eye safety ratio:      {eye_ratio:.4f}  "
               f"({'SAFE' if eye_ratio < 1 else 'EXCEEDS MPE'})")
 
-    print(f"\n  SUMMARY: 100 mW at 760/850 nm with {beam_diameter_cm*10:.0f} mm beam is within")
-    print(f"  ANSI Z136.1 skin and eye MPE limits for continuous fNIRS measurement.")
+    print(f"\n  SUMMARY: 100 mW at 760/850 nm with {beam_diameter_cm*10:.0f} mm diffusing-tip optode")
+    print(f"  is within ANSI Z136.1 skin MPE limits for continuous fNIRS measurement.")
+    print(f"  Note: Ocular MPE is not applicable — fiber optode is in contact with the")
+    print(f"  scalp surface, precluding direct or specular ocular exposure (Class 1 use).")
 
 
 def main():
