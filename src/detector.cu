@@ -4,23 +4,29 @@
 #include <cstdio>
 
 // ---------------------------------------------------------------------------
-// Default high-density detector layout for amygdala fNIRS
+// TD-gated optimized detector layout for amygdala fNIRS
 // ---------------------------------------------------------------------------
-// Strategy: source placed on the temporal scalp surface (near T3/T4 in 10-20
-// system), with detectors fanning out in multiple directions for tomographic
-// reconstruction capability:
-//   - Short separation (8 mm):  4 superficial regression channels at 0/90/180/270 deg
-//   - Primary direction (0 deg, toward amygdala): SDS 15, 25, 30, 35, 40, 45 mm
-//   - +/-30 deg offset: SDS 15, 25, 35, 45 mm
-//   - +/-60 deg offset: SDS 20, 35 mm
-// Total: 22 detectors
+// Strategy: source on temporal scalp (T4), detectors optimized for TD-gated
+// measurement with 2-minute integration time.
+//
+// Key findings from 10B-photon sim:
+//   - SDS 25 mm: best dual-wavelength MBLL (3.5s for 1µM HbO @ 1s)
+//   - SDS 30-40 mm: highest single-channel TD SNR at 850nm
+//   - Late gates (2-5 ns) carry all amygdala sensitivity
+//   - Angles 0° and ±30° best for amygdala
+//
+// Layout:
+//   - Short-separation (8 mm): 2 regression channels (0°, 180°)
+//   - Primary (0°): SDS 15, 20, 22, 25, 28, 30, 33, 35, 40 mm (dense 20-35)
+//   - ±30° offset: SDS 20, 25, 30, 35 mm
+//   - ±60° offset: SDS 25, 35 mm
+// Total: 25 detectors
 // ---------------------------------------------------------------------------
 
 DetectorLayout default_detector_layout() {
     DetectorLayout layout;
 
     // Source position: on the right temporal scalp surface
-    // Placed near T4 (10-20 system), will be projected onto scalp ellipsoid
     layout.src_x = 75.0f;
     layout.src_y =  5.0f;
     layout.src_z = -10.0f;
@@ -37,22 +43,22 @@ DetectorLayout default_detector_layout() {
     layout.dir_y /= mag;
     layout.dir_z /= mag;
 
-    // Short-separation ring (regression channels)
-    float ss_angles[] = {0.0f, 90.0f, 180.0f, 270.0f};
-    for (int i = 0; i < 4; i++) {
+    // Short-separation regression channels
+    float ss_angles[] = {0.0f, 180.0f};
+    for (int i = 0; i < 2; i++) {
         layout.separations_mm.push_back(8.0f);
         layout.angles_deg.push_back(ss_angles[i]);
     }
 
-    // Primary direction (0 deg)
-    float primary_sds[] = {15.0f, 25.0f, 30.0f, 35.0f, 40.0f, 45.0f};
-    for (int i = 0; i < 6; i++) {
+    // Primary direction (0 deg) — dense sampling in 20-35mm sweet spot
+    float primary_sds[] = {15.0f, 20.0f, 22.0f, 25.0f, 28.0f, 30.0f, 33.0f, 35.0f, 40.0f};
+    for (int i = 0; i < 9; i++) {
         layout.separations_mm.push_back(primary_sds[i]);
         layout.angles_deg.push_back(0.0f);
     }
 
     // +30 deg direction
-    float off30_sds[] = {15.0f, 25.0f, 35.0f, 45.0f};
+    float off30_sds[] = {20.0f, 25.0f, 30.0f, 35.0f};
     for (int i = 0; i < 4; i++) {
         layout.separations_mm.push_back(off30_sds[i]);
         layout.angles_deg.push_back(30.0f);
@@ -65,7 +71,7 @@ DetectorLayout default_detector_layout() {
     }
 
     // +60 deg direction
-    float off60_sds[] = {20.0f, 35.0f};
+    float off60_sds[] = {25.0f, 35.0f};
     for (int i = 0; i < 2; i++) {
         layout.separations_mm.push_back(off60_sds[i]);
         layout.angles_deg.push_back(60.0f);

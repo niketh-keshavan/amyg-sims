@@ -21,7 +21,7 @@ enum TissueType : uint8_t {
 // ---------------------------------------------------------------------------
 #define TPSF_BINS       512       // bins in TPSF histogram
 #define TPSF_BIN_PS     10.0f     // ps per bin -> 5.12 ns total
-#define NUM_TIME_GATES  6         // number of temporal gates
+#define NUM_TIME_GATES  10        // number of temporal gates (fine resolution in late gates)
 #define C_VACUUM_MM_PS  0.2998f   // speed of light in vacuum [mm/ps]
 
 // ---------------------------------------------------------------------------

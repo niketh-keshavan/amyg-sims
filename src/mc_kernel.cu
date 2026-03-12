@@ -135,12 +135,19 @@ __device__ int check_detectors(float x, float y, float z) {
 // Time gate assignment
 // ---------------------------------------------------------------------------
 __device__ __forceinline__ int get_time_gate(float tof_ps) {
+    // Fine resolution in 1.5-5 ns range where amygdala sensitivity lives
+    // Gates: [0-500, 500-1000, 1000-1500, 1500-2000, 2000-2500,
+    //         2500-3000, 3000-3500, 3500-4000, 4000-5000, 5000+] ps
     if (tof_ps < 500.0f)  return 0;
     if (tof_ps < 1000.0f) return 1;
     if (tof_ps < 1500.0f) return 2;
-    if (tof_ps < 2500.0f) return 3;
-    if (tof_ps < 4000.0f) return 4;
-    return 5;
+    if (tof_ps < 2000.0f) return 3;
+    if (tof_ps < 2500.0f) return 4;
+    if (tof_ps < 3000.0f) return 5;
+    if (tof_ps < 3500.0f) return 6;
+    if (tof_ps < 4000.0f) return 7;
+    if (tof_ps < 5000.0f) return 8;
+    return 9;
 }
 
 // ---------------------------------------------------------------------------
