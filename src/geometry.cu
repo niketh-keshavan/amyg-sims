@@ -4,59 +4,68 @@
 #include <chrono>
 
 // ---------------------------------------------------------------------------
-// Default adult head model parameters (literature-based)
+// Default adult head model with non-uniform skull thickness
 // ---------------------------------------------------------------------------
 // References:
-//   - Okada & Delpy (2003) - Near-infrared light propagation in an adult head model
-//   - Strangman et al. (2014) - Scalp and skull influence on NIRS signal
-//   - Amunts et al. (2005) - Amygdala morphometry
+//   Okada & Delpy (2003) - Near-infrared light propagation in an adult head
+//   Li et al. (2015) - Skull thickness measurements from CT
+//   Lynnerup (2005) - Cranial thickness in relation to age, sex, and body build
+//   Strangman et al. (2014) - Scalp and skull influence on NIRS signal
+//   Amunts et al. (2005) - Amygdala morphometry (MNI coordinates)
 //
-// Head center is at the grid center.
-// Coordinate system: X = left-right, Y = anterior-posterior, Z = inferior-superior
+// Skull thickness anatomy:
+//   Temporal squamous: 2-3 mm (thinnest, above ear)
+//   Frontal bone: 6-8 mm
+//   Parietal vertex: 6-7 mm
+//   Occipital: 7-10 mm
+//
+// Model: skull inner surface semi-axes interpolate between "thin" (temporal)
+// and "thick" (vertex) based on voxel position. The blending weight uses
+// |x|/scalp_a (laterality) and z (inferior = temporal).
 // ---------------------------------------------------------------------------
 
 HeadModelParams default_head_model() {
     HeadModelParams p{};
 
-    // Grid: 400x400x400 at 0.5 mm resolution = 200x200x200 mm volume
-    // 0.5mm voxels balance resolution with memory (64M voxels vs 1B at 0.1mm)
+    // Grid: 400x400x400 at 0.5mm = 200x200x200 mm volume
     p.nx = 400; p.ny = 400; p.nz = 400;
-    p.dx = 0.5f;  // mm
+    p.dx = 0.5f;
 
-    // Head center is at grid center: (100, 100, 100) mm
-    // Ellipsoidal layers (semi-axes in mm)
-    // X = medial-lateral (ML), Y = anterior-posterior (AP), Z = inferior-superior (SI)
-    // Adult head proportions: ~156 mm ML x 190 mm AP x 170 mm SI
-    // Based on Okada & Delpy (2003), Hoshi et al. (2011)
-
-    // Scalp outer surface
+    // Scalp outer surface (adult head: ~156 ML x 190 AP x 170 SI mm)
     p.scalp_a = 78.0f; p.scalp_b = 95.0f; p.scalp_c = 85.0f;
 
-    // Skull outer (scalp thickness ~4 mm)
+    // Skull outer (scalp thickness ~4mm uniform)
     p.skull_a = 74.0f; p.skull_b = 91.0f; p.skull_c = 81.0f;
 
-    // CSF outer / skull inner (skull thickness ~7 mm)
+    // Skull inner surface: non-uniform thickness
+    // At TEMPORAL bone (thin, ~2.5mm): skull inner = skull outer - 2.5mm
+    p.skull_inner_min_a = 71.5f;  // 74 - 2.5
+    p.skull_inner_min_b = 88.5f;  // 91 - 2.5
+    p.skull_inner_min_c = 78.5f;  // 81 - 2.5
+
+    // At VERTEX/frontal/occipital (thick, ~7mm): skull inner = skull outer - 7mm
+    p.skull_inner_max_a = 67.0f;  // 74 - 7
+    p.skull_inner_max_b = 84.0f;  // 91 - 7
+    p.skull_inner_max_c = 74.0f;  // 81 - 7
+
+    // CSF outer = skull inner at thickest (vertex) for consistency
+    // The non-uniform skull carves into what would be CSF space at temporal
     p.csf_a = 67.0f; p.csf_b = 84.0f; p.csf_c = 74.0f;
 
-    // Gray matter outer / CSF inner (CSF ~1.5 mm)
+    // Gray matter outer / CSF inner (CSF ~1.5mm)
     p.gm_a = 65.5f; p.gm_b = 82.5f; p.gm_c = 72.5f;
 
-    // White matter outer / GM inner (cortical GM ~3.5 mm)
+    // White matter outer / GM inner (cortical GM ~3.5mm)
     p.wm_a = 62.0f; p.wm_b = 79.0f; p.wm_c = 69.0f;
 
-    // Amygdala: ~15-20 mm long (AP), ~10 mm wide (ML), ~12 mm tall (SI)
-    // MNI-based coordinates (Amunts et al. 2005):
-    //   ~24 mm lateral, ~2 mm posterior, ~18 mm inferior to head center
-    // Depth from temporal scalp surface: ~50 mm
-    //   (scalp at x~76mm at this y,z; amygdala at x=24; depth = 52mm)
-
+    // Amygdala (MNI-based, Amunts et al. 2005)
     // Left amygdala
-    p.amyg_l_cx = -24.0f;  // left of center (negative X)
-    p.amyg_l_cy =  -2.0f;  // slightly posterior
-    p.amyg_l_cz = -18.0f;  // inferior
-    p.amyg_l_a  =   5.0f;  // semi-axis X (medial-lateral)
-    p.amyg_l_b  =   9.0f;  // semi-axis Y (anterior-posterior)
-    p.amyg_l_c  =   6.0f;  // semi-axis Z (inferior-superior)
+    p.amyg_l_cx = -24.0f;
+    p.amyg_l_cy =  -2.0f;
+    p.amyg_l_cz = -18.0f;
+    p.amyg_l_a  =   5.0f;
+    p.amyg_l_b  =   9.0f;
+    p.amyg_l_c  =   6.0f;
 
     // Right amygdala (mirror)
     p.amyg_r_cx =  24.0f;
@@ -70,26 +79,70 @@ HeadModelParams default_head_model() {
 }
 
 // ---------------------------------------------------------------------------
-// Build the voxelised volume
+// Skull thickness blending weight
+// ---------------------------------------------------------------------------
+// Returns 0.0 at temporal bone (thin), 1.0 at vertex (thick)
+// Based on anatomical position:
+//   - High |x|/a (lateral) AND low z (inferior) => temporal => thin
+//   - Low |x|/a (medial) OR high z (superior) => vertex => thick
+//
+// We use a smooth blend: w = 1 - lateral_factor * inferior_factor
+// where lateral_factor peaks at |x|=scalp_a (pure lateral)
+// and inferior_factor peaks at z << 0 (inferior)
+// ---------------------------------------------------------------------------
+static inline float skull_thickness_weight(float x, float y, float z,
+                                            float scalp_a, float scalp_c) {
+    // Laterality: how far lateral is this point? (0=midline, 1=fully lateral)
+    float lat = fabsf(x) / scalp_a;
+    lat = fminf(lat, 1.0f);
+    // Smooth step for laterality (temporal region starts at ~60% lateral)
+    float lat_factor = 0.0f;
+    if (lat > 0.4f) {
+        float t = (lat - 0.4f) / 0.4f;  // 0 at 40% lateral, 1 at 80%
+        t = fminf(t, 1.0f);
+        lat_factor = t * t * (3.0f - 2.0f * t);  // smoothstep
+    }
+
+    // Inferiority: temporal bone is inferior (z < 0)
+    // z/scalp_c: -1 = bottom, 0 = equator, +1 = top
+    float z_norm = z / scalp_c;
+    float inf_factor = 0.0f;
+    if (z_norm < 0.3f) {
+        float t = (0.3f - z_norm) / 0.8f;  // peaks at z_norm = -0.5
+        t = fminf(t, 1.0f);
+        inf_factor = t * t * (3.0f - 2.0f * t);
+    }
+
+    // Temporal thinning = lateral AND inferior
+    float temporal = lat_factor * inf_factor;
+
+    // Weight: 0 = thin (temporal), 1 = thick (vertex)
+    return 1.0f - temporal;
+}
+
+// ---------------------------------------------------------------------------
+// Build the voxelised volume with non-uniform skull
 // ---------------------------------------------------------------------------
 std::vector<uint8_t> build_head_volume(const HeadModelParams& p) {
     size_t total = (size_t)p.nx * p.ny * p.nz;
     std::vector<uint8_t> vol(total, TISSUE_AIR);
 
-    float cx = p.nx * p.dx * 0.5f;  // center in mm
+    float cx = p.nx * p.dx * 0.5f;
     float cy = p.ny * p.dx * 0.5f;
     float cz = p.nz * p.dx * 0.5f;
 
     printf("Building head volume: %dx%dx%d voxels (%.1f mm resolution)\n",
            p.nx, p.ny, p.nz, p.dx);
     printf("Volume center: (%.1f, %.1f, %.1f) mm\n", cx, cy, cz);
+    printf("Non-uniform skull: temporal ~%.1fmm, vertex ~%.1fmm\n",
+           p.skull_a - p.skull_inner_min_a,
+           p.skull_a - p.skull_inner_max_a);
 
     auto build_start = std::chrono::high_resolution_clock::now();
 
     for (int iz = 0; iz < p.nz; iz++) {
-        float z = (iz + 0.5f) * p.dx - cz;  // relative to center
+        float z = (iz + 0.5f) * p.dx - cz;
 
-        // Progress bar every 2% of slices
         if (p.nz >= 100 && iz % (p.nz / 50) == 0) {
             auto now = std::chrono::high_resolution_clock::now();
             double elapsed = std::chrono::duration<double>(now - build_start).count();
@@ -118,9 +171,6 @@ std::vector<uint8_t> build_head_volume(const HeadModelParams& p) {
 
                 size_t idx = ix + (size_t)iy * p.nx + (size_t)iz * p.nx * p.ny;
 
-                // Check ellipsoidal shells (inside-out: assign deepest layer first)
-                // Ellipsoid test: (x/a)^2 + (y/b)^2 + (z/c)^2 <= 1
-
                 // Check amygdala first (embedded in white/gray matter)
                 float al = ((x - p.amyg_l_cx) / p.amyg_l_a) * ((x - p.amyg_l_cx) / p.amyg_l_a)
                          + ((y - p.amyg_l_cy) / p.amyg_l_b) * ((y - p.amyg_l_cy) / p.amyg_l_b)
@@ -135,23 +185,42 @@ std::vector<uint8_t> build_head_volume(const HeadModelParams& p) {
                     continue;
                 }
 
-                // Concentric shells
+                // White matter
                 float e_wm = (x/p.wm_a)*(x/p.wm_a) + (y/p.wm_b)*(y/p.wm_b) + (z/p.wm_c)*(z/p.wm_c);
                 if (e_wm <= 1.0f) { vol[idx] = TISSUE_WHITE; continue; }
 
+                // Gray matter
                 float e_gm = (x/p.gm_a)*(x/p.gm_a) + (y/p.gm_b)*(y/p.gm_b) + (z/p.gm_c)*(z/p.gm_c);
                 if (e_gm <= 1.0f) { vol[idx] = TISSUE_GRAY; continue; }
 
+                // CSF
                 float e_csf = (x/p.csf_a)*(x/p.csf_a) + (y/p.csf_b)*(y/p.csf_b) + (z/p.csf_c)*(z/p.csf_c);
                 if (e_csf <= 1.0f) { vol[idx] = TISSUE_CSF; continue; }
 
+                // --- Non-uniform skull ---
+                // Blend skull inner surface between thin (temporal) and thick (vertex)
+                float w = skull_thickness_weight(x, y, z, p.scalp_a, p.scalp_c);
+
+                // Interpolated skull inner semi-axes at this position
+                float si_a = p.skull_inner_min_a * (1.0f - w) + p.skull_inner_max_a * w;
+                float si_b = p.skull_inner_min_b * (1.0f - w) + p.skull_inner_max_b * w;
+                float si_c = p.skull_inner_min_c * (1.0f - w) + p.skull_inner_max_c * w;
+
+                // Is this point inside the skull inner surface?
+                float e_si = (x/si_a)*(x/si_a) + (y/si_b)*(y/si_b) + (z/si_c)*(z/si_c);
+                if (e_si <= 1.0f) {
+                    // Inside skull inner = CSF (between non-uniform skull and fixed CSF)
+                    vol[idx] = TISSUE_CSF;
+                    continue;
+                }
+
+                // Skull outer
                 float e_sk = (x/p.skull_a)*(x/p.skull_a) + (y/p.skull_b)*(y/p.skull_b) + (z/p.skull_c)*(z/p.skull_c);
                 if (e_sk <= 1.0f) { vol[idx] = TISSUE_SKULL; continue; }
 
+                // Scalp
                 float e_sc = (x/p.scalp_a)*(x/p.scalp_a) + (y/p.scalp_b)*(y/p.scalp_b) + (z/p.scalp_c)*(z/p.scalp_c);
                 if (e_sc <= 1.0f) { vol[idx] = TISSUE_SCALP; continue; }
-
-                // Outside head = air (already default)
             }
         }
     }
@@ -176,39 +245,24 @@ std::vector<uint8_t> build_head_volume(const HeadModelParams& p) {
                names[t], counts[t], counts[t] * p.dx * p.dx * p.dx);
     }
 
-    return vol;
-}
-
-// ---------------------------------------------------------------------------
-// Optical properties at 730 nm and 850 nm
-// ---------------------------------------------------------------------------
-// Values from literature (Strangman et al. 2003, Okada & Delpy 2003,
-// Jacques 2013, Sassaroli & Bhatt 2020)
-//
-// mu_a: absorption coefficient [1/mm]
-// mu_s: reduced scattering coefficient [1/mm] (we store mu_s' and set g)
-//       mu_s = mu_s' / (1 - g)
-// g:    anisotropy factor
-// n:    refractive index
-// ---------------------------------------------------------------------------
-void get_optical_properties(int wavelength_idx, OpticalProps props[NUM_TISSUE_TYPES]) {
-    if (wavelength_idx == 0) {
-        // 730 nm  (higher scattering than 760 due to shorter wavelength)
-        props[TISSUE_AIR]      = {0.0f,    0.0f,    1.0f, 1.000f};
-        props[TISSUE_SCALP]    = {0.0200f, 11.2f,   0.9f, 1.37f};  // mu_s'=1.12
-        props[TISSUE_SKULL]    = {0.0150f, 13.2f,   0.9f, 1.56f};  // mu_s'=1.32
-        props[TISSUE_CSF]      = {0.0026f,  0.1f,   0.9f, 1.33f};  // nearly transparent
-        props[TISSUE_GRAY]     = {0.0190f, 11.5f,   0.9f, 1.37f};  // mu_s'=1.15
-        props[TISSUE_WHITE]    = {0.0170f, 14.4f,   0.9f, 1.37f};  // mu_s'=1.44
-        props[TISSUE_AMYGDALA] = {0.0210f, 11.5f,   0.9f, 1.37f};  // similar to GM
-    } else {
-        // 850 nm
-        props[TISSUE_AIR]      = {0.0f,    0.0f,    1.0f, 1.000f};
-        props[TISSUE_SCALP]    = {0.0170f,  9.4f,   0.9f, 1.37f};
-        props[TISSUE_SKULL]    = {0.0116f, 10.9f,   0.9f, 1.56f};
-        props[TISSUE_CSF]      = {0.0026f,  0.1f,   0.9f, 1.33f};
-        props[TISSUE_GRAY]     = {0.0192f,  9.6f,   0.9f, 1.37f};
-        props[TISSUE_WHITE]    = {0.0145f, 12.1f,   0.9f, 1.37f};
-        props[TISSUE_AMYGDALA] = {0.0210f,  9.6f,   0.9f, 1.37f};
+    // Print skull thickness at key locations
+    printf("Skull thickness verification:\n");
+    // Check right temporal (x=+74, y=0, z=-10)
+    float test_pts[][3] = {
+        { 74.0f,  0.0f, -10.0f},  // right temporal
+        {-74.0f,  0.0f, -10.0f},  // left temporal
+        {  0.0f,  0.0f,  81.0f},  // vertex
+        {  0.0f, 91.0f,   0.0f},  // frontal
+        {  0.0f,-91.0f,   0.0f},  // occipital
+    };
+    const char* loc_names[] = {"R temporal", "L temporal", "Vertex", "Frontal", "Occipital"};
+    for (int i = 0; i < 5; i++) {
+        float tx = test_pts[i][0], ty = test_pts[i][1], tz = test_pts[i][2];
+        float w = skull_thickness_weight(tx, ty, tz, p.scalp_a, p.scalp_c);
+        float si_a = p.skull_inner_min_a * (1.0f - w) + p.skull_inner_max_a * w;
+        float thickness_a = p.skull_a - si_a;
+        printf("  %-12s: w=%.2f, thickness~%.1f mm\n", loc_names[i], w, thickness_a);
     }
+
+    return vol;
 }

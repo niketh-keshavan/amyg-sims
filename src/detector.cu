@@ -4,34 +4,50 @@
 #include <cstdio>
 
 // ---------------------------------------------------------------------------
-// TD-gated optimized detector layout for amygdala fNIRS
+// Optimized detector layout for amygdala fNIRS
 // ---------------------------------------------------------------------------
-// Strategy: source on temporal scalp (T4), detectors optimized for TD-gated
-// measurement with 2-minute integration time.
+// Source positioned directly over the right amygdala projection on the
+// temporal bone — the thinnest skull region (~2.5mm).
 //
-// Key findings from 10B-photon sim:
-//   - SDS 25 mm: best dual-wavelength MBLL (3.5s for 1µM HbO @ 1s)
-//   - SDS 30-40 mm: highest single-channel TD SNR at 850nm
-//   - Late gates (2-5 ns) carry all amygdala sensitivity
-//   - Angles 0° and ±30° best for amygdala
+// Right amygdala center: (+24, -2, -18) mm from head center
+// Temporal scalp surface above it: ~(+76, -2, -18) mm
 //
-// Layout:
-//   - Short-separation (8 mm): 2 regression channels (0°, 180°)
-//   - Primary (0°): SDS 15, 20, 22, 25, 28, 30, 33, 35, 40 mm (dense 20-35)
-//   - ±30° offset: SDS 20, 25, 30, 35 mm
-//   - ±60° offset: SDS 25, 35 mm
-// Total: 23 detectors
+// Source is projected radially outward from amygdala center onto scalp.
+// This minimizes the photon path through skull to reach the amygdala.
+//
+// Detectors: 4mm radius SiPM arrays (e.g., Hamamatsu S14160-3050HS
+// 3x3mm active area, or tiled 6x6mm MPPC arrays giving ~3-4mm effective
+// radius in circular approximation).
+//
+// Layout optimized for TD-gated measurement:
+//   - Short-separation (8mm): 2 regression channels
+//   - Primary (0 deg): SDS 15-40mm, dense in 20-35mm sweet spot
+//   - +/-30 deg offset: SDS 20, 25, 30, 35mm
+//   - +/-60 deg offset: SDS 25, 35mm
 // ---------------------------------------------------------------------------
 
 DetectorLayout default_detector_layout() {
     DetectorLayout layout;
 
-    // Source position: on the right temporal scalp surface
-    layout.src_x = 75.0f;
-    layout.src_y =  5.0f;
-    layout.src_z = -10.0f;
+    // Source position: project from right amygdala center radially onto scalp
+    // Amygdala at (+24, -2, -18), scalp ellipsoid (78, 95, 85)
+    // Direction from center to amygdala = (24, -2, -18), normalize and scale to scalp
+    float ax = 24.0f, ay = -2.0f, az = -18.0f;
+    // For ellipsoidal projection: find t such that (t*ax/78)^2 + (t*ay/95)^2 + (t*az/85)^2 = 1
+    float ea = ax / 78.0f, eb = ay / 95.0f, ec = az / 85.0f;
+    float t_scalp = 1.0f / sqrtf(ea * ea + eb * eb + ec * ec);
 
-    // Primary direction: inferior-posterior (toward amygdala projection)
+    layout.src_x = t_scalp * ax;   // ~76mm lateral
+    layout.src_y = t_scalp * ay;   // ~-6mm posterior
+    layout.src_z = t_scalp * az;   // ~-57mm inferior
+
+    printf("Source placement: projecting from amygdala (%.0f,%.0f,%.0f) onto scalp\n",
+           ax, ay, az);
+    printf("  Source on scalp: (%.1f, %.1f, %.1f) mm\n",
+           layout.src_x, layout.src_y, layout.src_z);
+
+    // Primary direction: inferior-posterior along temporal surface
+    // (roughly toward where more amygdala sensitivity is expected)
     layout.dir_x =  0.0f;
     layout.dir_y = -0.3f;
     layout.dir_z = -0.954f;
@@ -50,7 +66,7 @@ DetectorLayout default_detector_layout() {
         layout.angles_deg.push_back(ss_angles[i]);
     }
 
-    // Primary direction (0 deg) — dense sampling in 20-35mm sweet spot
+    // Primary direction (0 deg) - dense sampling in 20-35mm sweet spot
     float primary_sds[] = {15.0f, 20.0f, 22.0f, 25.0f, 28.0f, 30.0f, 33.0f, 35.0f, 40.0f};
     for (int i = 0; i < 9; i++) {
         layout.separations_mm.push_back(primary_sds[i]);
@@ -83,7 +99,8 @@ DetectorLayout default_detector_layout() {
         layout.angles_deg.push_back(-60.0f);
     }
 
-    layout.det_radius = 2.0f;
+    // 4mm radius SiPM arrays
+    layout.det_radius = 4.0f;
 
     return layout;
 }
@@ -99,7 +116,7 @@ std::vector<Detector> build_detectors(const DetectorLayout& layout) {
     float cy = hm.ny * hm.dx * 0.5f;
     float cz = hm.nz * hm.dx * 0.5f;
 
-    // Compute surface normal at source (radial direction for spherical head)
+    // Surface normal at source (radial for ellipsoid)
     float nmag = sqrtf(layout.src_x * layout.src_x +
                        layout.src_y * layout.src_y +
                        layout.src_z * layout.src_z);
@@ -107,7 +124,7 @@ std::vector<Detector> build_detectors(const DetectorLayout& layout) {
     float sny = layout.src_y / nmag;
     float snz = layout.src_z / nmag;
 
-    // Primary tangent (the provided direction)
+    // Primary tangent
     float t1x = layout.dir_x;
     float t1y = layout.dir_y;
     float t1z = layout.dir_z;
@@ -121,24 +138,21 @@ std::vector<Detector> build_detectors(const DetectorLayout& layout) {
         t2x /= t2mag; t2y /= t2mag; t2z /= t2mag;
     }
 
-    printf("Detector configuration (high-density, %d detectors):\n",
-           (int)layout.separations_mm.size());
+    printf("Detector configuration (%d detectors, %.0fmm radius SiPM):\n",
+           (int)layout.separations_mm.size(), layout.det_radius);
     printf("  Source (raw): (%.1f, %.1f, %.1f) mm\n",
            layout.src_x, layout.src_y, layout.src_z);
     printf("  Primary dir: (%.3f, %.3f, %.3f)\n",
            layout.dir_x, layout.dir_y, layout.dir_z);
-    printf("  Tangent2:    (%.3f, %.3f, %.3f)\n", t2x, t2y, t2z);
 
     for (size_t i = 0; i < layout.separations_mm.size(); i++) {
         float sds = layout.separations_mm[i];
         float angle_rad = layout.angles_deg[i] * 3.14159265358979f / 180.0f;
 
-        // Rotate primary direction by angle around surface normal
         float dx = t1x * cosf(angle_rad) + t2x * sinf(angle_rad);
         float dy = t1y * cosf(angle_rad) + t2y * sinf(angle_rad);
         float dz = t1z * cosf(angle_rad) + t2z * sinf(angle_rad);
 
-        // Place detector at SDS distance from source
         float det_cx = layout.src_x + dx * sds;
         float det_cy = layout.src_y + dy * sds;
         float det_cz = layout.src_z + dz * sds;
@@ -155,7 +169,6 @@ std::vector<Detector> build_detectors(const DetectorLayout& layout) {
             det_cz *= scale;
         }
 
-        // Convert to voxel-space coordinates
         Detector det;
         det.x = det_cx + cx;
         det.y = det_cy + cy;
@@ -163,7 +176,7 @@ std::vector<Detector> build_detectors(const DetectorLayout& layout) {
         det.radius = layout.det_radius;
         det.id = (int)i;
 
-        printf("  Det %2d: SDS=%4.0f mm  angle=%+4.0f deg -> voxel(%.1f, %.1f, %.1f) mm\n",
+        printf("  Det %2d: SDS=%4.0f mm  angle=%+4.0f deg -> (%.1f, %.1f, %.1f) mm\n",
                det.id, sds, layout.angles_deg[i], det.x, det.y, det.z);
 
         dets.push_back(det);
