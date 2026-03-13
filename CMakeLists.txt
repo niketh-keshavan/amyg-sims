@@ -16,6 +16,9 @@ if(NOT TARGET CUDA::curand)
     find_library(CURAND_LIB curand HINTS ${CUDAToolkit_LIBRARY_DIR} ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 endif()
 
+set(CURAND_LINK $<IF:$<TARGET_EXISTS:CUDA::curand>,CUDA::curand,${CURAND_LIB}>)
+
+# ── Voxel-based MC (original) ──────────────────────────────────────────────
 add_executable(mc_fnirs
     src/main.cu
     src/mc_kernel.cu
@@ -23,7 +26,6 @@ add_executable(mc_fnirs
     src/detector.cu
     src/optical_properties.cu
 )
-
 target_include_directories(mc_fnirs PRIVATE include)
 if(TARGET CUDA::curand)
     target_link_libraries(mc_fnirs PRIVATE CUDA::curand)
@@ -32,8 +34,25 @@ elseif(CURAND_LIB)
 else()
     message(FATAL_ERROR "curand not found. Install libcurand-dev or set CUDAToolkit_LIBRARY_DIR.")
 endif()
-
-# Optimization flags
 target_compile_options(mc_fnirs PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3>
+)
+
+# ── Mesh-Based MC (MMC) with MNI152 head model ────────────────────────────
+add_executable(mmc_fnirs
+    src/mmc_main.cu
+    src/mmc_kernel.cu
+    src/mmc_geometry.cu
+    src/optical_properties.cu
+)
+target_include_directories(mmc_fnirs PRIVATE include)
+if(TARGET CUDA::curand)
+    target_link_libraries(mmc_fnirs PRIVATE CUDA::curand)
+elseif(CURAND_LIB)
+    target_link_libraries(mmc_fnirs PRIVATE ${CURAND_LIB})
+else()
+    message(FATAL_ERROR "curand not found.")
+endif()
+target_compile_options(mmc_fnirs PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3>
 )
