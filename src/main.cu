@@ -1,5 +1,6 @@
 #include "types.cuh"
 #include "geometry.cuh"
+#include "optical_properties.cuh"
 #include "detector.cuh"
 #include "mc_kernel.cuh"
 #include <cstdio>
@@ -27,7 +28,7 @@ static void save_results_json(
     int n_dets,
     const std::vector<float>& separations,
     const std::vector<float>& angles,
-    int wavelength_idx,
+    float wavelength_nm,
     const SimConfig& config,
     const double* gated_weight,
     const double* gated_partial_pl,
@@ -36,14 +37,15 @@ static void save_results_json(
     FILE* f = fopen(filename, "w");
     if (!f) return;
 
-    const char* wl_str = (wavelength_idx == 0) ? "730" : "850";
-
     fprintf(f, "{\n");
-    fprintf(f, "  \"wavelength_nm\": %s,\n", wl_str);
+    fprintf(f, "  \"wavelength_nm\": %.0f,\n", wavelength_nm);
     fprintf(f, "  \"num_photons\": %llu,\n", (unsigned long long)config.num_photons);
     fprintf(f, "  \"voxel_size_mm\": %.2f,\n", config.dx);
     fprintf(f, "  \"grid_size\": [%d, %d, %d],\n", config.nx, config.ny, config.nz);
     fprintf(f, "  \"laser_power_W\": 0.4,\n");
+    fprintf(f, "  \"detector_radius_mm\": %.1f,\n", config.dx);  // from detector layout
+    fprintf(f, "  \"skull_model\": \"non-uniform (temporal ~2.5mm, vertex ~7mm)\",\n");
+    fprintf(f, "  \"scattering_model\": \"mie_power_law\",\n");
     fprintf(f, "  \"tpsf_bins\": %d,\n", TPSF_BINS);
     fprintf(f, "  \"tpsf_bin_ps\": %.1f,\n", (double)TPSF_BIN_PS);
     fprintf(f, "  \"time_gate_edges_ps\": [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000],\n");
@@ -112,19 +114,41 @@ static void save_results_json(
 }
 
 // ---------------------------------------------------------------------------
+// Parse wavelength list from comma-separated string
+// ---------------------------------------------------------------------------
+static std::vector<float> parse_wavelengths(const char* str) {
+    std::vector<float> wls;
+    const char* p = str;
+    while (*p) {
+        char* end;
+        float val = strtof(p, &end);
+        if (end == p) break;
+        if (val >= 650.0f && val <= 950.0f) {
+            wls.push_back(val);
+        } else {
+            fprintf(stderr, "WARNING: wavelength %.0f nm outside supported range [650-950], skipping\n", val);
+        }
+        p = end;
+        if (*p == ',') p++;
+    }
+    return wls;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     printf("=============================================================\n");
     printf("  fNIRS Monte Carlo - TD/FD Amygdala Oxygenation\n");
-    printf("  Wavelengths: 730 nm & 850 nm | 400 mW (15mm beam)\n");
-    printf("  0.5 mm voxels | Ellipsoidal head model | Photon path recording\n");
-    printf("  High-density array | TPSF + Time-gated outputs\n");
+    printf("  Mie scattering model | Non-uniform skull | Targeted source\n");
+    printf("  0.5 mm voxels | Ellipsoidal head model\n");
+    printf("  4mm SiPM detectors | TPSF + Time-gated outputs\n");
     printf("=============================================================\n\n");
 
     // --- Parse arguments ---
     uint64_t num_photons = 100000000ULL;  // 100M default
     std::string output_dir = "data";
+    std::vector<float> wavelengths;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--photons") == 0 && i + 1 < argc) {
@@ -133,13 +157,32 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
             output_dir = argv[i + 1];
             i++;
+        } else if (strcmp(argv[i], "--wavelengths") == 0 && i + 1 < argc) {
+            wavelengths = parse_wavelengths(argv[i + 1]);
+            i++;
         }
+    }
+
+    // Default wavelengths: classic fNIRS pair
+    if (wavelengths.empty()) {
+        wavelengths.push_back(730.0f);
+        wavelengths.push_back(850.0f);
+    }
+
+    if (wavelengths.size() > MAX_WAVELENGTHS) {
+        fprintf(stderr, "ERROR: max %d wavelengths supported\n", MAX_WAVELENGTHS);
+        return 1;
     }
 
     printf("Configuration:\n");
     printf("  Photons per wavelength: %llu\n", (unsigned long long)num_photons);
     printf("  Output directory: %s\n", output_dir.c_str());
-    printf("  Laser power: 400 mW (15mm beam, ANSI Z136.1 compliant)\n");
+    printf("  Wavelengths (%d):", (int)wavelengths.size());
+    for (float wl : wavelengths) printf(" %.0fnm", wl);
+    printf("\n");
+    printf("  Scattering model: Mie power law + chromophore absorption\n");
+    printf("  Skull model: non-uniform (temporal ~2.5mm, vertex ~7mm)\n");
+    printf("  Detector radius: 4mm (SiPM array)\n");
     printf("  Voxel size: 0.5 mm\n");
     printf("  TPSF bins: %d x %.0f ps = %.1f ns\n\n",
            TPSF_BINS, (double)TPSF_BIN_PS,
@@ -177,11 +220,13 @@ int main(int argc, char** argv) {
     cudaMalloc(&d_fluence, vol_size * sizeof(float));
 
     // --- Run simulation for each wavelength ---
-    const char* wl_names[] = {"730nm", "850nm"};
+    for (int wl = 0; wl < (int)wavelengths.size(); wl++) {
+        float wavelength_nm = wavelengths[wl];
+        char wl_tag[32];
+        snprintf(wl_tag, sizeof(wl_tag), "%.0fnm", wavelength_nm);
 
-    for (int wl = 0; wl < 2; wl++) {
         printf("\n=========================================\n");
-        printf("  Wavelength: %s\n", wl_names[wl]);
+        printf("  Wavelength: %s\n", wl_tag);
         printf("=========================================\n");
 
         // Configure simulation
@@ -212,7 +257,7 @@ int main(int argc, char** argv) {
         config.src_y = src_cy + center_y;
         config.src_z = src_cz + center_z;
 
-        // Verify source is inside the scalp
+        // Verify source tissue
         float e_verify = (src_cx / hm.scalp_a) * (src_cx / hm.scalp_a)
                        + (src_cy / hm.scalp_b) * (src_cy / hm.scalp_b)
                        + (src_cz / hm.scalp_c) * (src_cz / hm.scalp_c);
@@ -242,10 +287,13 @@ int main(int argc, char** argv) {
         config.src_dy = sy / smag;
         config.src_dz = sz / smag;
 
-        config.beam_radius = 7.5f;  // 15 mm beam diameter (diffusing optode, 400mW ANSI-safe)
+        config.beam_radius = 7.5f;  // 15mm beam diameter
 
         config.wavelength_idx = wl;
-        get_optical_properties(wl, config.tissue);
+
+        // Use Mie scattering optical properties
+        compute_optical_properties(wavelength_nm, config.tissue);
+        print_optical_properties(wavelength_nm, config.tissue);
 
         config.weight_threshold = 1e-4f;
         config.roulette_m = 10;
@@ -310,7 +358,7 @@ int main(int argc, char** argv) {
         // --- Save outputs ---
         char fname[256];
 
-        // Fluence: only save for small grids (skip for 0.1mm = 1000^3)
+        // Fluence
         if (vol_size <= 64000000ULL) {
             std::vector<float> h_fluence(vol_size);
             cudaMemcpy(h_fluence.data(), d_fluence, vol_size * sizeof(float),
@@ -324,10 +372,9 @@ int main(int argc, char** argv) {
             }
 
             snprintf(fname, sizeof(fname), "%s/fluence_%s.bin",
-                     output_dir.c_str(), wl_names[wl]);
+                     output_dir.c_str(), wl_tag);
             save_binary(fname, h_fluence.data(), vol_size * sizeof(float));
         } else {
-            // For large grids, just check a diagnostic sample
             float sample[1];
             size_t center = vol_size / 2;
             cudaMemcpy(sample, d_fluence + center, sizeof(float), cudaMemcpyDeviceToHost);
@@ -337,16 +384,14 @@ int main(int argc, char** argv) {
 
         // TPSF binary
         snprintf(fname, sizeof(fname), "%s/tpsf_%s.bin",
-                 output_dir.c_str(), wl_names[wl]);
+                 output_dir.c_str(), wl_tag);
         save_binary(fname, tpsf.data(), (size_t)n_dets * TPSF_BINS * sizeof(double));
 
         // Photon paths
         printf("Recorded photon paths: %d\n", num_paths);
         if (num_paths > 0) {
-            // Save path metadata: det_id and path_length per path
             snprintf(fname, sizeof(fname), "%s/paths_meta_%s.bin",
-                     output_dir.c_str(), wl_names[wl]);
-            // Interleave det_id and length: [det0, len0, det1, len1, ...]
+                     output_dir.c_str(), wl_tag);
             std::vector<int> meta(num_paths * 2);
             for (int i = 0; i < num_paths; i++) {
                 meta[i * 2 + 0] = path_det[i];
@@ -354,24 +399,23 @@ int main(int argc, char** argv) {
             }
             save_binary(fname, meta.data(), num_paths * 2 * sizeof(int));
 
-            // Save path positions: [x,y,z] * MAX_PATH_STEPS * num_paths
             snprintf(fname, sizeof(fname), "%s/paths_pos_%s.bin",
-                     output_dir.c_str(), wl_names[wl]);
+                     output_dir.c_str(), wl_tag);
             save_binary(fname, path_pos.data(),
                         (size_t)num_paths * MAX_PATH_STEPS * 3 * sizeof(float));
         }
 
-        // JSON results (with TD data)
+        // JSON results
         snprintf(fname, sizeof(fname), "%s/results_%s.json",
-                 output_dir.c_str(), wl_names[wl]);
+                 output_dir.c_str(), wl_tag);
         save_results_json(fname, results.data(), n_dets,
                          det_layout.separations_mm, det_layout.angles_deg,
-                         wl, config,
+                         wavelength_nm, config,
                          gated_weight.data(), gated_partial_pl.data(),
                          gated_count.data());
     }
 
-    // --- Save volume for visualization (skip for large grids) ---
+    // --- Save volume for visualization ---
     char fname[256];
     if (vol_size <= 64000000ULL) {
         snprintf(fname, sizeof(fname), "%s/volume.bin", output_dir.c_str());
@@ -388,6 +432,17 @@ int main(int argc, char** argv) {
         fprintf(f, "{\n");
         fprintf(f, "  \"nx\": %d, \"ny\": %d, \"nz\": %d,\n", hm.nx, hm.ny, hm.nz);
         fprintf(f, "  \"dx\": %.2f,\n", hm.dx);
+        fprintf(f, "  \"skull_model\": \"non-uniform\",\n");
+        fprintf(f, "  \"skull_temporal_thickness_mm\": 2.5,\n");
+        fprintf(f, "  \"skull_vertex_thickness_mm\": 7.0,\n");
+        fprintf(f, "  \"scattering_model\": \"mie_power_law\",\n");
+        fprintf(f, "  \"detector_radius_mm\": %.1f,\n", det_layout.det_radius);
+        fprintf(f, "  \"wavelengths_nm\": [");
+        for (int i = 0; i < (int)wavelengths.size(); i++) {
+            if (i > 0) fprintf(f, ", ");
+            fprintf(f, "%.0f", wavelengths[i]);
+        }
+        fprintf(f, "],\n");
         fprintf(f, "  \"tissue_labels\": {\n");
         fprintf(f, "    \"0\": \"air\", \"1\": \"scalp\", \"2\": \"skull\",\n");
         fprintf(f, "    \"3\": \"csf\", \"4\": \"gray_matter\",\n");

@@ -21,6 +21,7 @@ add_executable(mc_fnirs
     src/mc_kernel.cu
     src/geometry.cu
     src/detector.cu
+    src/optical_properties.cu
 )
 
 target_include_directories(mc_fnirs PRIVATE include)
