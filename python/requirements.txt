@@ -2,3 +2,9 @@ numpy>=1.24
 matplotlib>=3.7
 tqdm>=4.65
 vastai>=0.2.8
+# MMC mesh generation
+nilearn>=0.10
+nibabel>=5.0
+scikit-image>=0.21
+scipy>=1.11
+tetgen>=0.6
