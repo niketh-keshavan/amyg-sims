@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
     printf("  Scattering model: Mie power law + chromophore absorption\n");
     printf("  Skull model: non-uniform (temporal ~2.5mm, vertex ~7mm)\n");
     printf("  Detector: Hamamatsu S14160-3050HS SiPM (3x3mm active area)\n");
-    printf("  Voxel size: 0.25 mm (high resolution)\n");
+    printf("  Voxel size: 0.125 mm (ultra-high resolution)\n");
     printf("  TPSF bins: %d x %.0f ps = %.1f ns\n\n",
            TPSF_BINS, (double)TPSF_BIN_PS,
            TPSF_BINS * (double)TPSF_BIN_PS / 1000.0);
@@ -383,7 +383,7 @@ int main(int argc, char** argv) {
         char fname[256];
 
         // Fluence
-        if (vol_size <= 512000000ULL) {
+        if (vol_size <= 4096000000ULL) {  // Up to 4B voxels for 0.125mm
             std::vector<float> h_fluence(vol_size);
             cudaMemcpy(h_fluence.data(), d_fluence, vol_size * sizeof(float),
                        cudaMemcpyDeviceToHost);
@@ -442,7 +442,7 @@ int main(int argc, char** argv) {
 
     // --- Save volume for visualization ---
     char fname[256];
-    if (vol_size <= 512000000ULL) {
+    if (vol_size <= 4096000000ULL) {  // Save volume up to 4B voxels (0.125mm)
         snprintf(fname, sizeof(fname), "%s/volume.bin", output_dir.c_str());
         save_binary(fname, volume.data(), vol_size);
     } else {
