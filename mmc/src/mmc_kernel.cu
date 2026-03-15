@@ -554,11 +554,11 @@ __global__ void mmc_kernel(
         }
     }
     
-    // Accumulate statistics (atomic)
-    atomicAdd(&stats->launched, local_launched);
-    atomicAdd(&stats->detected, local_detected);
-    atomicAdd(&stats->escaped, local_escaped);
-    atomicAdd(&stats->absorbed, local_absorbed);
+    // Accumulate statistics (atomic) - cast to unsigned long long for CUDA atomicAdd
+    atomicAdd((unsigned long long*)&stats->launched, (unsigned long long)local_launched);
+    atomicAdd((unsigned long long*)&stats->detected, (unsigned long long)local_detected);
+    atomicAdd((unsigned long long*)&stats->escaped, (unsigned long long)local_escaped);
+    atomicAdd((unsigned long long*)&stats->absorbed, (unsigned long long)local_absorbed);
 }
 
 } // namespace mmc
