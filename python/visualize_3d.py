@@ -22,6 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -67,7 +68,7 @@ def load_data(data_dir):
         meta = json.load(f)
     
     results = {}
-    for wl in ["730nm", "850nm"]:
+    for wl in tqdm(["730nm", "850nm"], desc="Loading data", unit="wl"):
         fp = data_dir / f"results_{wl}.json"
         if fp.exists():
             with open(fp) as f:
@@ -238,7 +239,7 @@ def plot_3d_detector_array(results, output_dir):
     
     colors = plt.cm.tab10(np.linspace(0, 1, len(angle_groups)))
     
-    for idx, (angle, dets) in enumerate(sorted(angle_groups.items())):
+    for idx, (angle, dets) in enumerate(tqdm(list(sorted(angle_groups.items())), desc="Detector groups", unit="group", leave=False)):
         xs = [d['x'] for d in dets]
         ys = [d['y'] for d in dets]
         zs = [d['z'] for d in dets]
@@ -329,7 +330,7 @@ def plot_3d_photon_paths(paths, results, output_dir, max_paths=500):
         indices = rng.choice(n_paths, min(max_paths, n_paths), replace=False)
         
         amyg_count = 0
-        for idx in indices:
+        for idx in tqdm(list(indices), desc="Processing paths", unit="path", leave=False):
             nsteps = pdata["path_lens"][idx]
             if nsteps < 2:
                 continue
