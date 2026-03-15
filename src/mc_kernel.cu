@@ -32,6 +32,9 @@ __constant__ SimConfig d_config;
 __constant__ Detector  d_dets[128];   // max 128 detectors
 __constant__ int       d_n_dets;
 
+// 3D texture for cached volume access (spatial locality)
+__constant__ cudaTextureObject_t d_vol_tex;  // set at kernel launch
+
 // Path recording: per-detector counters
 __device__ int d_path_count[128];          // how many paths recorded per detector
 __device__ int d_total_paths;              // global path counter
@@ -51,6 +54,21 @@ int pos_to_voxel(float x, float y, float z) {
     return ix + iy * d_config.nx + iz * d_config.nx * d_config.ny;
 }
 
+// ---------------------------------------------------------------------------
+// Cached volume lookup via 3D texture (exploits spatial locality)
+// ---------------------------------------------------------------------------
+__device__ __forceinline__
+uint8_t get_tissue_cached(float x, float y, float z) {
+    // Normalize to [0,1] texture coordinates
+    float u = x / (d_config.nx * d_config.dx);
+    float v = y / (d_config.ny * d_config.dx);
+    float w = z / (d_config.nz * d_config.dx);
+    
+    // Texture automatically handles boundary clamping and caches spatial locality
+    return (uint8_t)tex3D<uint8_t>(d_vol_tex, u, v, w);
+}
+
+// Fallback: direct global memory access (for non-textured builds)
 __device__ __forceinline__
 uint8_t get_tissue(const uint8_t* volume, float x, float y, float z) {
     int idx = pos_to_voxel(x, y, z);
@@ -459,10 +477,35 @@ void launch_mc_simulation(
     int nx = config.nx, ny = config.ny, nz = config.nz;
     size_t vol_size = (size_t)nx * ny * nz;
 
-    // --- Upload volume ---
-    uint8_t* d_volume;
-    cudaMalloc(&d_volume, vol_size);
-    cudaMemcpy(d_volume, h_volume, vol_size, cudaMemcpyHostToDevice);
+    // --- Upload volume to 3D texture for cached access ---
+    cudaArray_t d_volume_array;
+    cudaExtent vol_extent = make_cudaExtent(nx, ny, nz);
+    cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uint8_t>();
+    cudaMalloc3DArray(&d_volume_array, &channel_desc, vol_extent);
+    
+    cudaMemcpy3DParms copy_params = {0};
+    copy_params.srcPtr = make_cudaPitchedPtr((void*)h_volume, nx * sizeof(uint8_t), nx, ny);
+    copy_params.dstArray = d_volume_array;
+    copy_params.extent = vol_extent;
+    copy_params.kind = cudaMemcpyHostToDevice;
+    cudaMemcpy3D(&copy_params);
+    
+    // Create texture object with spatial filtering
+    cudaResourceDesc res_desc = {};
+    res_desc.resType = cudaResourceTypeArray;
+    res_desc.res.array.array = d_volume_array;
+    
+    cudaTextureDesc tex_desc = {};
+    tex_desc.addressMode[0] = cudaAddressModeClamp;
+    tex_desc.addressMode[1] = cudaAddressModeClamp;
+    tex_desc.addressMode[2] = cudaAddressModeClamp;
+    tex_desc.filterMode = cudaFilterModePoint;  // Nearest neighbor for discrete tissue IDs
+    tex_desc.readMode = cudaReadModeElementType;
+    tex_desc.normalizedCoords = 1;  // Use [0,1] coordinates
+    
+    cudaTextureObject_t vol_tex;
+    cudaCreateTextureObject(&vol_tex, &res_desc, &tex_desc, nullptr);
+    cudaMemcpyToSymbol(d_vol_tex, &vol_tex, sizeof(cudaTextureObject_t));
 
     // --- Upload config to constant memory ---
     cudaMemcpyToSymbol(d_config, &config, sizeof(SimConfig));
@@ -648,7 +691,8 @@ void launch_mc_simulation(
     }
 
     // --- Cleanup ---
-    cudaFree(d_volume);
+    cudaDestroyTextureObject(vol_tex);
+    cudaFreeArray(d_volume_array);
     cudaFree(d_det_weight);
     cudaFree(d_det_pathlength);
     cudaFree(d_det_partial_pl);
