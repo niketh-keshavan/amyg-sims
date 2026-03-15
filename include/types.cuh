@@ -89,6 +89,8 @@ struct Detector {
     float x, y, z;            // center position [mm]
     float radius;             // acceptance radius [mm]
     int   id;
+    float nx, ny, nz;         // surface normal (outward from head) [unit vector]
+    float n_critical;         // critical angle cosine (n_air / n_tissue)
 };
 
 // ---------------------------------------------------------------------------

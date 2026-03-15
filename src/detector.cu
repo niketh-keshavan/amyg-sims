@@ -175,9 +175,29 @@ std::vector<Detector> build_detectors(const DetectorLayout& layout) {
         det.z = det_cz + cz;
         det.radius = layout.det_radius;
         det.id = (int)i;
+        
+        // Surface normal: radial direction from head center (outward from head)
+        float rx = det_cx, ry = det_cy, rz = det_cz;
+        float r_mag = sqrtf(rx*rx + ry*ry + rz*rz);
+        if (r_mag > 1e-6f) {
+            det.nx = rx / r_mag;
+            det.ny = ry / r_mag;
+            det.nz = rz / r_mag;
+        } else {
+            det.nx = det.ny = 0.0f; det.nz = 1.0f;
+        }
+        
+        // Critical angle: photons with dot(dir, normal) < cos_critical are rejected
+        // Using scalp refractive index (~1.4) and air (1.0)
+        // cos_critical = sqrt(1 - (n_air/n_scalp)^2) for total internal reflection
+        // But for detection: photons exiting at grazing angles have poor coupling
+        // We use a conservative value: cos_critical = n_air / n_scalp ≈ 0.714
+        det.n_critical = 1.0f / 1.4f;  // n_air / n_scalp ≈ 0.714
 
-        printf("  Det %2d: SDS=%4.0f mm  angle=%+4.0f deg -> (%.1f, %.1f, %.1f) mm\n",
-               det.id, sds, layout.angles_deg[i], det.x, det.y, det.z);
+        printf("  Det %2d: SDS=%4.0f mm  angle=%+4.0f deg -> (%.1f, %.1f, %.1f) mm  "
+               "normal=(%.2f, %.2f, %.2f)  cos_crit=%.3f\n",
+               det.id, sds, layout.angles_deg[i], det.x, det.y, det.z,
+               det.nx, det.ny, det.nz, det.n_critical);
 
         dets.push_back(det);
     }

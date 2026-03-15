@@ -70,6 +70,24 @@ static std::vector<Detector> build_mni152_detectors(const float src[3], float de
         d.z = src[2] + sds*(ca*axis[2] + sa*lat[2]);
         d.radius = det_radius;
         d.id = id++;
+        
+        // Surface normal: radial direction from head center (MNI origin)
+        // Head ellipsoid approx: 78mm x 95mm x 85mm
+        // Normal is direction from center scaled by inverse ellipsoid radii
+        float rx = d.x / 78.0f, ry = d.y / 95.0f, rz = d.z / 85.0f;
+        float r_mag = sqrtf(rx*rx + ry*ry + rz*rz);
+        if (r_mag > 1e-6f) {
+            d.nx = rx / r_mag;
+            d.ny = ry / r_mag;
+            d.nz = rz / r_mag;
+        } else {
+            d.nx = d.ny = 0.0f; d.nz = 1.0f;
+        }
+        
+        // Critical angle: photons with dot(dir, normal) < n_critical are rejected
+        // n_air / n_scalp ≈ 1.0 / 1.4 ≈ 0.714
+        d.n_critical = 1.0f / 1.4f;
+        
         dets.push_back(d);
     };
 
@@ -79,7 +97,8 @@ static std::vector<Detector> build_mni152_detectors(const float src[3], float de
         for (float s : sds_off)
             add(s, ang);
 
-    printf("Created %d detectors (radius=%.1f mm)\n", (int)dets.size(), det_radius);
+    printf("Created %d detectors (radius=%.1f mm) with angular acceptance\n", 
+           (int)dets.size(), det_radius);
     return dets;
 }
 
