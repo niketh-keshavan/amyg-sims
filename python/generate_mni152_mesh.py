@@ -33,6 +33,39 @@ import time
 import numpy as np
 from scipy import ndimage
 
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+    # Fallback tqdm stub
+    class tqdm:
+        def __init__(self, iterable=None, desc='', total=None, **kwargs):
+            self.iterable = iterable
+            self.desc = desc
+            if iterable is not None:
+                self.total = len(iterable) if total is None and hasattr(iterable, '__len__') else total
+            else:
+                self.total = total
+            self.n = 0
+            if desc:
+                print(f"{desc}...")
+        def __iter__(self):
+            if self.iterable is None:
+                return iter([])
+            for item in self.iterable:
+                yield item
+                self.n += 1
+            return
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def update(self, n=1):
+            self.n += n
+        def close(self):
+            pass
+
 # Tissue label constants matching TissueType enum in types.cuh
 TISSUE_AIR      = 0
 TISSUE_SCALP    = 1
@@ -158,7 +191,8 @@ def build_tissue_labels(t1, gm, wm, csf, brain_mask, voxel_size_mm=1.0):
         labels[sphere & brain] = TISSUE_AMYGDALA
 
     print(f"Tissue label summary:")
-    for t, name in enumerate(['air','scalp','skull','csf','gray','white','amygdala']):
+    tissue_names = ['air','scalp','skull','csf','gray','white','amygdala']
+    for t, name in enumerate(tqdm(tissue_names, desc="  Counting voxels", leave=False)):
         n = np.sum(labels == t)
         print(f"  {name}: {n:,} voxels")
 
@@ -188,7 +222,7 @@ def build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine):
                            kk.ravel()*voxel_size, np.ones(ii.size)], axis=0)
 
     # Transform each center to voxel space
-    for center_hom in amyg_centers_mni:
+    for center_hom in tqdm(amyg_centers_mni, desc="  Processing amygdala regions", leave=False):
         center_vox = inv_affine @ center_hom
         ci, cj, ck = center_vox[:3]
         di = (ii - ci) * voxel_size
@@ -225,11 +259,14 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
 
     # Ensure manifold: fill holes and close gaps
     print("Cleaning surface mask (morphological operations)...")
-    head_bin = ndimage.binary_fill_holes(head_bin)
-    # Small opening to remove thin bridges, then closing to fill small holes
-    head_bin = ndimage.binary_opening(head_bin, iterations=1)
-    head_bin = ndimage.binary_closing(head_bin, iterations=2)
-    head_bin = ndimage.binary_fill_holes(head_bin)
+    morph_ops = [
+        ("Filling holes", lambda x: ndimage.binary_fill_holes(x)),
+        ("Opening (remove bridges)", lambda x: ndimage.binary_opening(x, iterations=1)),
+        ("Closing (fill gaps)", lambda x: ndimage.binary_closing(x, iterations=2)),
+        ("Final hole fill", lambda x: ndimage.binary_fill_holes(x)),
+    ]
+    for desc, op in tqdm(morph_ops, desc="  Morphological ops", leave=False):
+        head_bin = op(head_bin)
 
     # Smooth to reduce staircase artifacts
     head_smooth = ndimage.gaussian_filter(head_bin.astype(np.float32), sigma=smooth_sigma)
@@ -306,16 +343,19 @@ def assign_tissue_labels(nodes_mm, elems, labels_vol, affine):
 
     Uses trilinear-sampled tissue label from the segmented atlas.
     """
+    print("  Computing centroids...")
     inv_aff = np.linalg.inv(affine)
 
     # Compute centroids in MNI mm
     centroids = nodes_mm[elems[:, :4]].mean(axis=1)  # (M, 3)
 
     # Map MNI mm → voxel indices
+    print("  Mapping to voxel space...")
     cents_hom = np.hstack([centroids, np.ones((len(centroids),1))])
     vox_coords = (inv_aff @ cents_hom.T).T[:, :3]  # (M, 3)
 
     # Nearest-neighbor lookup
+    print("  Sampling tissue labels...")
     vi = np.round(vox_coords[:,0]).astype(int)
     vj = np.round(vox_coords[:,1]).astype(int)
     vk = np.round(vox_coords[:,2]).astype(int)
@@ -327,10 +367,12 @@ def assign_tissue_labels(nodes_mm, elems, labels_vol, affine):
 
     tissue_labels = labels_vol[vi, vj, vk].astype(np.int32)
 
-    for t, name in enumerate(['air','scalp','skull','csf','gray','white','amygdala']):
+    print("  Counting tissue types...")
+    for t, name in enumerate(tqdm(['air','scalp','skull','csf','gray','white','amygdala'], 
+                                   desc="  Tissue counts", leave=False)):
         n = np.sum(tissue_labels == t)
         if n > 0:
-            print(f"  {name}: {n:,} tets")
+            print(f"    {name}: {n:,} tets")
 
     return tissue_labels
 
@@ -366,9 +408,7 @@ def compute_tet_neighbors(elems):
     # Map sorted face (i,j,k) -> (elem_id, local_face_id)
     face_map = {}
 
-    for e in range(M):
-        if e % 500000 == 0 and e > 0:
-            print(f"  {e:,}/{M:,} ({100*e/M:.0f}%)")
+    for e in tqdm(range(M), desc="  Processing elements", unit="tet", ncols=80):
         v = elems[e]
         for f, (i, j, k) in enumerate(FACE_VERTS):
             key = tuple(sorted([int(v[i]), int(v[j]), int(v[k])]))
@@ -451,33 +491,45 @@ def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
     print("  MNI152 Head Mesh Generation for MMC fNIRS")
     print("="*60)
 
+    # Define pipeline steps for overall progress
+    steps = [
+        ("Load atlas", lambda: load_mni152_atlas()),
+        ("Build tissue labels", lambda d: build_tissue_labels_with_affine(d[0], d[1], d[2], d[3], d[4], d[5])),
+        ("Extract scalp surface", lambda d: extract_scalp_surface(d, None, smooth_sigma=2.5)),
+        ("Tetrahedral mesh", lambda d: mesh_with_tetgen(d[0], d[1], max_vol=max_vol, min_dihedral=min_dihedral)),
+        ("Assign tissue labels", lambda d: assign_tissue_labels(d[0], d[1], d[2], d[3])),
+        ("Compute neighbors", lambda d: compute_tet_neighbors(d)),
+        ("Save mesh", lambda d: save_mmcmesh(output_path, d[0], d[1], d[2], d[3])),
+    ]
+
     # 1. Load atlas
+    print("\n[1/7] Loading atlas...")
     t1, gm, wm, csf, brain_mask, affine = load_mni152_atlas()
 
     # 2. Build tissue label volume
-    print("\nBuilding tissue label volume...")
+    print("\n[2/7] Building tissue label volume...")
     labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
 
     # 3. Extract scalp surface
-    print("\nExtracting scalp surface...")
+    print("\n[3/7] Extracting scalp surface...")
     surf_verts, surf_faces = extract_scalp_surface(labels, affine, smooth_sigma=2.5)
 
     # 4. Tetrahedral mesh
-    print("\nGenerating tetrahedral mesh...")
+    print("\n[4/7] Generating tetrahedral mesh...")
     nodes, elems = mesh_with_tetgen(surf_verts, surf_faces,
                                      max_vol=max_vol,
                                      min_dihedral=min_dihedral)
 
     # 5. Assign tissue labels
-    print("\nAssigning tissue labels...")
+    print("\n[5/7] Assigning tissue labels...")
     tissue_labels = assign_tissue_labels(nodes, elems, labels, affine)
 
     # 6. Neighbor connectivity
-    print("\nBuilding neighbor connectivity...")
+    print("\n[6/7] Building neighbor connectivity...")
     neighbors = compute_tet_neighbors(elems)
 
     # 7. Save
-    print("\nSaving binary mesh...")
+    print("\n[7/7] Saving binary mesh...")
     save_mmcmesh(output_path, nodes, elems, tissue_labels, neighbors)
 
     print(f"\nTotal time: {time.time()-t_total:.1f}s")
@@ -516,14 +568,15 @@ def main():
 
     # Dependency check
     missing = []
-    for pkg in ['nilearn','nibabel','skimage','tetgen','scipy']:
+    for pkg in ['nilearn','nibabel','skimage','tetgen','scipy','tqdm']:
         try:
             __import__(pkg)
         except ImportError:
             missing.append(pkg)
     if missing:
         print("Missing packages. Install with:")
-        print(f"  pip install {' '.join(missing).replace('skimage','scikit-image')}")
+        install_pkgs = ' '.join(missing).replace('skimage','scikit-image')
+        print(f"  pip install {install_pkgs}")
         sys.exit(1)
 
     generate_mni152_mesh(args.output,
