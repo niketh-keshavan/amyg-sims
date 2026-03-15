@@ -113,7 +113,8 @@ def validate_against_diffusion(results_730, results_850, output_dir):
             
             # Reflectance = detected weight / (4π * SDS²) [approximate normalization]
             # More accurate: weight per unit detector area
-            det_area = np.pi * (4.0**2)  # 4mm radius detector
+            # Hamamatsu S14160-3050HS: 3x3mm = 9 mm² active area
+            det_area = 9.0  # mm²
             R_mc = weight / (n_photons * det_area)
             
             # Standard error (Poisson statistics)
