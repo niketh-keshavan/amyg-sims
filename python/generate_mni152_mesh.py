@@ -451,7 +451,7 @@ def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
 
     # 3. Extract scalp surface
     print("\nExtracting scalp surface...")
-    surf_verts, surf_faces = extract_scalp_surface(labels, affine, smooth_sigma=1.5)
+    surf_verts, surf_faces = extract_scalp_surface(labels, affine, smooth_sigma=2.5)
 
     # 4. Tetrahedral mesh
     print("\nGenerating tetrahedral mesh...")
