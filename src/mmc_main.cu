@@ -452,9 +452,26 @@ int main(int argc, char* argv[])
     GridData    grid      = build_spatial_grid(host_mesh);
     MMCMeshDevice dev_mesh = upload_mmc_mesh(host_mesh, grid);
 
-    // Build detectors (source-relative, MNI space)
-    float src_tmp[3] = {55.f, -8.f, -30.f};   // approximate; refined per wavelength
-    std::vector<Detector> dets = build_mni152_detectors(src_tmp, 4.0f);
+    // Compute actual source position (same as run_wavelength)
+    float amyg_center[3] = {24.f, -2.f, -20.f};
+    float src_dir_unnorm[3] = {
+        host_mesh.bbox_max[0]*0.9f - amyg_center[0],
+        -8.f - amyg_center[1],
+        -10.f - amyg_center[2]
+    };
+    float src_len = sqrtf(src_dir_unnorm[0]*src_dir_unnorm[0]
+                        + src_dir_unnorm[1]*src_dir_unnorm[1]
+                        + src_dir_unnorm[2]*src_dir_unnorm[2]);
+    float src_pos[3] = {
+        amyg_center[0] + 55.f * src_dir_unnorm[0] / src_len,
+        amyg_center[1] + 55.f * src_dir_unnorm[1] / src_len,
+        amyg_center[2] + 55.f * src_dir_unnorm[2] / src_len
+    };
+    
+    // Build detectors relative to ACTUAL source position
+    std::vector<Detector> dets = build_mni152_detectors(src_pos, 4.0f);
+    printf("Built %d detectors around source (%.1f, %.1f, %.1f)\n", 
+           (int)dets.size(), src_pos[0], src_pos[1], src_pos[2]);
 
     // Run each wavelength
     for (float wl : wavelengths) {
