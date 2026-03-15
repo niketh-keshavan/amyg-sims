@@ -26,8 +26,8 @@
 // Tissue types
 enum TissueType { AIR=0, SCALP=1, SKULL=2, CSF=3, GRAY=4, WHITE=5, AMYGDALA=6 };
 
-// Tissue colors (RGB 0-1)
-const float TISSUE_COLORS[7][3] = {
+// Tissue colors (RGB 0-1) - host copy
+const float h_TISSUE_COLORS[7][3] = {
     {0.0f, 0.0f, 0.0f},      // Air - black
     {0.9f, 0.7f, 0.6f},      // Scalp - skin tone
     {0.95f, 0.95f, 0.85f},   // Skull - ivory
@@ -36,6 +36,9 @@ const float TISSUE_COLORS[7][3] = {
     {0.95f, 0.95f, 0.95f},   // White matter - white
     {1.0f, 0.2f, 0.2f},      // Amygdala - red
 };
+
+// Device copy of tissue colors
+__constant__ float TISSUE_COLORS[7][3];
 
 // Simple vertex structure
 struct Vertex {
@@ -140,6 +143,9 @@ __global__ void extract_surface_kernel(
 // Generate mesh from volume
 void generate_mesh(const char* volume_file, const char* output_base) {
     printf("Loading volume from %s...\n", volume_file);
+    
+    // Copy tissue colors to device constant memory
+    cudaMemcpyToSymbol(TISSUE_COLORS, h_TISSUE_COLORS, sizeof(float) * 7 * 3);
     
     size_t vol_size = (size_t)NX * NY * NZ;
     std::vector<uint8_t> volume(vol_size);
