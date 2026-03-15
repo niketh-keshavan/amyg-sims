@@ -308,6 +308,12 @@ __global__ void mmc_init_rng(curandState* states, unsigned long long seed, int n
 //  Main MMC photon transport kernel
 // ===========================================================================
 
+// Debug counters (optional, enabled when debugging)
+__device__ unsigned long long d_debug_photons_launched = 0;
+__device__ unsigned long long d_debug_photons_to_air = 0;
+__device__ unsigned long long d_debug_photons_in_radius = 0;
+__device__ unsigned long long d_debug_photons_detected = 0;
+
 __global__ void mmc_photon_kernel(
     MMCMeshDevice       mesh,
     MMCConfig           config,
@@ -319,7 +325,8 @@ __global__ void mmc_photon_kernel(
     float*              tpsf,
     double*             gated_weight,
     double*             gated_pathlength,
-    curandState*        rng_states)
+    curandState*        rng_states,
+    bool                debug_mode = false)
 {
     int tid            = blockIdx.x * blockDim.x + threadIdx.x;
     long long n_threads = (long long)gridDim.x * blockDim.x;
@@ -338,6 +345,8 @@ __global__ void mmc_photon_kernel(
 
     for (long long ph = (long long)tid; ph < (long long)config.num_photons; ph += n_threads)
     {
+        if (debug_mode && tid == 0) atomicAdd(&d_debug_photons_launched, 1);
+        
         // ---- Launch photon --------------------------------------------------
         float r   = config.beam_radius * sqrtf(curand_uniform(&rng));
         float phi = 2.0f * CUDART_PI_F * curand_uniform(&rng);
@@ -367,12 +376,17 @@ __global__ void mmc_photon_kernel(
 
             // Photon exited to air (external boundary)
             if (cur_tissue == TISSUE_AIR || elem_id < 0) {
+                if (debug_mode) atomicAdd(&d_debug_photons_to_air, 1);
+                
                 // Check all detectors
+                bool detected = false;
                 for (int d = 0; d < num_detectors; d++) {
                     float3 dp   = make_float3(detectors[d].x, detectors[d].y, detectors[d].z);
                     float3 diff = pos - dp;
                     if (len2(diff) > detectors[d].radius * detectors[d].radius)
                         continue;  // outside detector area
+                    
+                    if (debug_mode) atomicAdd(&d_debug_photons_in_radius, 1);
                     
                     // Check angular acceptance: photon direction vs detector surface normal
                     // Photon must be coming from inside the head (aligned with normal)
@@ -385,8 +399,10 @@ __global__ void mmc_photon_kernel(
                                      config,
                                      det_weight, det_pathlength, det_count,
                                      tpsf, gated_weight, gated_pathlength);
+                    detected = true;
                     break;   // count each photon once
                 }
+                if (debug_mode && detected) atomicAdd(&d_debug_photons_detected, 1);
                 break;   // terminate photon
             }
 
