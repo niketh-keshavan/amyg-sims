@@ -643,6 +643,7 @@ def generate_colored_noise(n_samples, dt, noise_std, seed=42):
     # Add physiological peaks as Gaussian bumps in frequency domain
     def add_peak(freq_center, amplitude_factor, width_hz=0.05):
         """Add a Gaussian peak in frequency domain."""
+        nonlocal amplitude
         peak = amplitude_factor * np.exp(-0.5 * ((freqs - freq_center) / width_hz) ** 2)
         amplitude += peak
     
