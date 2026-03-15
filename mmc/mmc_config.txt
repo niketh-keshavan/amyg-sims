@@ -1,9 +1,0 @@
-# MMC Simulation Configuration
-# Edit this file or use command line arguments
-
-mesh_path = data/mni152_head.mmcmesh
-output_dir = results_mmc
-num_photons_760nm = 100000000
-num_photons_850nm = 100000000
-max_bounces = 100000
-gpu_device = 0
