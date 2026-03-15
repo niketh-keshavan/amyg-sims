@@ -477,35 +477,10 @@ void launch_mc_simulation(
     int nx = config.nx, ny = config.ny, nz = config.nz;
     size_t vol_size = (size_t)nx * ny * nz;
 
-    // --- Upload volume to 3D texture for cached access ---
-    cudaArray_t d_volume_array;
-    cudaExtent vol_extent = make_cudaExtent(nx, ny, nz);
-    cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<uint8_t>();
-    cudaMalloc3DArray(&d_volume_array, &channel_desc, vol_extent);
-    
-    cudaMemcpy3DParms copy_params = {0};
-    copy_params.srcPtr = make_cudaPitchedPtr((void*)h_volume, nx * sizeof(uint8_t), nx, ny);
-    copy_params.dstArray = d_volume_array;
-    copy_params.extent = vol_extent;
-    copy_params.kind = cudaMemcpyHostToDevice;
-    cudaMemcpy3D(&copy_params);
-    
-    // Create texture object with spatial filtering
-    cudaResourceDesc res_desc = {};
-    res_desc.resType = cudaResourceTypeArray;
-    res_desc.res.array.array = d_volume_array;
-    
-    cudaTextureDesc tex_desc = {};
-    tex_desc.addressMode[0] = cudaAddressModeClamp;
-    tex_desc.addressMode[1] = cudaAddressModeClamp;
-    tex_desc.addressMode[2] = cudaAddressModeClamp;
-    tex_desc.filterMode = cudaFilterModePoint;  // Nearest neighbor for discrete tissue IDs
-    tex_desc.readMode = cudaReadModeElementType;
-    tex_desc.normalizedCoords = 1;  // Use [0,1] coordinates
-    
-    cudaTextureObject_t vol_tex;
-    cudaCreateTextureObject(&vol_tex, &res_desc, &tex_desc, nullptr);
-    cudaMemcpyToSymbol(d_vol_tex, &vol_tex, sizeof(cudaTextureObject_t));
+    // --- Upload volume ---
+    uint8_t* d_volume;
+    cudaMalloc(&d_volume, vol_size);
+    cudaMemcpy(d_volume, h_volume, vol_size, cudaMemcpyHostToDevice);
 
     // --- Upload config to constant memory ---
     cudaMemcpyToSymbol(d_config, &config, sizeof(SimConfig));
@@ -691,8 +666,7 @@ void launch_mc_simulation(
     }
 
     // --- Cleanup ---
-    cudaDestroyTextureObject(vol_tex);
-    cudaFreeArray(d_volume_array);
+    cudaFree(d_volume);
     cudaFree(d_det_weight);
     cudaFree(d_det_pathlength);
     cudaFree(d_det_partial_pl);
