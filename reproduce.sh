@@ -66,6 +66,9 @@ python sensitivity_analysis.py --data-dir "../$OUTPUT_DIR" --output-dir "../$FIG
 # Visualization
 python visualize.py --data-dir "../$OUTPUT_DIR" --output-dir "../$FIGURE_DIR" 2>&1 | tee -a "../$OUTPUT_DIR/reproduction.log"
 
+# 3D Visualization
+python visualize_3d.py --data-dir "../$OUTPUT_DIR" --output-dir "../$FIGURE_DIR" 2>&1 | tee -a "../$OUTPUT_DIR/reproduction.log"
+
 cd ..
 
 echo ""

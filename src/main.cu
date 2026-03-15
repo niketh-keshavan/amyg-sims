@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
     printf("  Scattering model: Mie power law + chromophore absorption\n");
     printf("  Skull model: non-uniform (temporal ~2.5mm, vertex ~7mm)\n");
     printf("  Detector radius: 4mm (SiPM array)\n");
-    printf("  Voxel size: 0.5 mm\n");
+    printf("  Voxel size: 0.25 mm (high resolution)\n");
     printf("  TPSF bins: %d x %.0f ps = %.1f ns\n\n",
            TPSF_BINS, (double)TPSF_BIN_PS,
            TPSF_BINS * (double)TPSF_BIN_PS / 1000.0);
@@ -216,8 +216,32 @@ int main(int argc, char** argv) {
 
     // --- Allocate fluence volume on GPU ---
     size_t vol_size = (size_t)hm.nx * hm.ny * hm.nz;
+    size_t fluence_bytes = vol_size * sizeof(float);
+    
+    printf("Memory requirements:\n");
+    printf("  Volume: %zu voxels (%.1f MB)\n", vol_size, vol_size / (1024.0*1024.0));
+    printf("  Fluence: %.1f MB\n", fluence_bytes / (1024.0*1024.0));
+    
+    size_t free_mem, total_mem;
+    cudaMemGetInfo(&free_mem, &total_mem);
+    printf("  GPU memory: %.1f MB free / %.1f MB total\n", 
+           free_mem / (1024.0*1024.0), total_mem / (1024.0*1024.0));
+    
+    if (fluence_bytes > free_mem * 0.8) {
+        fprintf(stderr, "ERROR: Not enough GPU memory for fluence volume\n");
+        fprintf(stderr, "  Required: %.1f MB, Available: %.1f MB\n",
+                fluence_bytes / (1024.0*1024.0), free_mem / (1024.0*1024.0));
+        fprintf(stderr, "  Consider reducing grid size or using a GPU with more memory\n");
+        return 1;
+    }
+    
     float* d_fluence;
-    cudaMalloc(&d_fluence, vol_size * sizeof(float));
+    cudaError_t alloc_err = cudaMalloc(&d_fluence, fluence_bytes);
+    if (alloc_err != cudaSuccess) {
+        fprintf(stderr, "ERROR: Failed to allocate fluence volume: %s\n", 
+                cudaGetErrorString(alloc_err));
+        return 1;
+    }
 
     // --- Run simulation for each wavelength ---
     for (int wl = 0; wl < (int)wavelengths.size(); wl++) {
@@ -359,7 +383,7 @@ int main(int argc, char** argv) {
         char fname[256];
 
         // Fluence
-        if (vol_size <= 64000000ULL) {
+        if (vol_size <= 512000000ULL) {
             std::vector<float> h_fluence(vol_size);
             cudaMemcpy(h_fluence.data(), d_fluence, vol_size * sizeof(float),
                        cudaMemcpyDeviceToHost);
@@ -379,7 +403,8 @@ int main(int argc, char** argv) {
             size_t center = vol_size / 2;
             cudaMemcpy(sample, d_fluence + center, sizeof(float), cudaMemcpyDeviceToHost);
             printf("Fluence sanity check (center voxel): %.6e\n", (double)sample[0]);
-            printf("(Skipping full fluence save for large grid: %zu voxels)\n", vol_size);
+            printf("(Skipping full fluence save for large grid: %zu voxels = %zu MB)\n", 
+               vol_size, vol_size * sizeof(float) / (1024*1024));
         }
 
         // TPSF binary
@@ -417,7 +442,7 @@ int main(int argc, char** argv) {
 
     // --- Save volume for visualization ---
     char fname[256];
-    if (vol_size <= 64000000ULL) {
+    if (vol_size <= 512000000ULL) {
         snprintf(fname, sizeof(fname), "%s/volume.bin", output_dir.c_str());
         save_binary(fname, volume.data(), vol_size);
     } else {
