@@ -27,9 +27,9 @@
 HeadModelParams default_head_model() {
     HeadModelParams p{};
 
-    // Grid: 400x400x400 at 0.5mm = 200x200x200 mm volume
-    p.nx = 400; p.ny = 400; p.nz = 400;
-    p.dx = 0.5f;
+    // Grid: 800x800x800 at 0.25mm = 200x200x200 mm volume
+    p.nx = 800; p.ny = 800; p.nz = 800;
+    p.dx = 0.25f;
 
     // Scalp outer surface (adult head: ~156 ML x 190 AP x 170 SI mm)
     p.scalp_a = 78.0f; p.scalp_b = 95.0f; p.scalp_c = 85.0f;
@@ -131,7 +131,7 @@ std::vector<uint8_t> build_head_volume(const HeadModelParams& p) {
     float cy = p.ny * p.dx * 0.5f;
     float cz = p.nz * p.dx * 0.5f;
 
-    printf("Building head volume: %dx%dx%d voxels (%.1f mm resolution)\n",
+    printf("Building head volume: %dx%dx%d voxels (%.2f mm resolution)\n",
            p.nx, p.ny, p.nz, p.dx);
     printf("Volume center: (%.1f, %.1f, %.1f) mm\n", cx, cy, cz);
     printf("Non-uniform skull: temporal ~%.1fmm, vertex ~%.1fmm\n",

@@ -18,6 +18,9 @@ echo ""
 echo "=== Generating figures ==="
 python3 -u python/visualize.py --data-dir "$DATA_DIR" --output-dir "$FIG_DIR"
 
+echo "=== Generating 3D figures ==="
+python3 -u python/visualize_3d.py --data-dir "$DATA_DIR" --output-dir "$FIG_DIR"
+
 echo ""
 echo "=== Done ==="
 echo ""
