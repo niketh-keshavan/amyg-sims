@@ -86,8 +86,9 @@ static std::vector<Detector> build_mni152_detectors(const float src[3], float de
         }
         
         // Critical angle: photons with dot(dir, normal) < n_critical are rejected
-        // n_air / n_scalp ≈ 1.0 / 1.4 ≈ 0.714
-        d.n_critical = 1.0f / 1.4f;
+        // Using 0.0 means accept all photons exiting toward detector (full hemisphere)
+        // n_air / n_scalp ≈ 0.714 would be ~44 degrees - too restrictive
+        d.n_critical = 0.0f;  // Accept all photons within detector radius
         
         dets.push_back(d);
     };
@@ -390,10 +391,32 @@ static void run_wavelength(
     CUDA_CHECK(cudaMemcpy(h_gated_pl.data(),   d_gated_pl,   gpl_sz,     cudaMemcpyDeviceToHost));
 
     // Print quick summary
-    printf("Detections: ");
-    for (int d = 0; d < nd && d < 8; d++)
-        printf("d%d=%llu  ", d, h_det_count[d]);
-    printf("...\n");
+    // Debug: Show detection stats
+    printf("\nDetection Statistics:\n");
+    unsigned long long total_detections = 0;
+    for (int d = 0; d < nd; d++) {
+        total_detections += h_det_count[d];
+        if (h_det_count[d] > 0 && d < 10) {
+            printf("  Det %d: %llu detections, weight=%.4e\n", 
+                   d, h_det_count[d], h_det_weight[d]);
+        }
+    }
+    printf("  Total detections: %llu across %d detectors\n", total_detections, nd);
+    
+    if (total_detections == 0) {
+        printf("\n⚠️  WARNING: No detections! Debugging info:\n");
+        printf("    Source: (%.1f, %.1f, %.1f) mm, tissue=%d\n",
+               cfg.src_pos[0], cfg.src_pos[1], cfg.src_pos[2], cfg.src_elem);
+        printf("    Source element tissue type: %d\n", 
+               (cfg.src_elem >= 0 && cfg.src_elem < (int)host_mesh.tissue.size()) ? 
+               host_mesh.tissue[cfg.src_elem] : -1);
+        printf("    Photons launched: %llu\n", (unsigned long long)num_photons);
+        printf("    Detectors: %d\n", nd);
+        for (int d = 0; d < min(3, nd); d++) {
+            printf("    Det %d: (%.1f, %.1f, %.1f), radius=%.1f\n",
+                   d, dets[d].x, dets[d].y, dets[d].z, dets[d].radius);
+        }
+    }
 
     // Save JSON
     char tag[16];
@@ -484,6 +507,19 @@ int main(int argc, char* argv[])
     std::vector<Detector> dets = build_mni152_detectors(src_pos, 4.0f);
     printf("Built %d detectors around source (%.1f, %.1f, %.1f)\n", 
            (int)dets.size(), src_pos[0], src_pos[1], src_pos[2]);
+    
+    // Debug: Show first few detector positions
+    printf("First 3 detector positions:\n");
+    for (int i = 0; i < min(3, (int)dets.size()); i++) {
+        printf("  Det %d: (%.1f, %.1f, %.1f), radius=%.1f, normal=(%.2f, %.2f, %.2f)\n",
+               dets[i].id, dets[i].x, dets[i].y, dets[i].z, 
+               dets[i].radius, dets[i].nx, dets[i].ny, dets[i].nz);
+    }
+    
+    // Debug: Check mesh bbox
+    printf("Mesh bbox: (%.1f, %.1f, %.1f) -> (%.1f, %.1f, %.1f)\n",
+           host_mesh.bbox_min[0], host_mesh.bbox_min[1], host_mesh.bbox_min[2],
+           host_mesh.bbox_max[0], host_mesh.bbox_max[1], host_mesh.bbox_max[2]);
 
     // Run each wavelength
     for (float wl : wavelengths) {
