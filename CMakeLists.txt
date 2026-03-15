@@ -38,6 +38,16 @@ target_compile_options(mc_fnirs PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3>
 )
 
+# ── 3D Model Exporter ─────────────────────────────────────────────────────
+add_executable(export_3d_model
+    src/export_3d_model.cu
+)
+target_include_directories(export_3d_model PRIVATE include)
+target_link_libraries(export_3d_model PRIVATE CUDA::cudart)
+target_compile_options(export_3d_model PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3>
+)
+
 # ── Mesh-Based MC (MMC) with MNI152 head model ────────────────────────────
 # This is built separately from the mmc/ subdirectory
 # See mmc/README.md for build instructions
