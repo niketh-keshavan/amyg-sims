@@ -15,6 +15,7 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include <cstdint>
 #include <cuda_runtime.h>
 
 #define VOXEL_SIZE 0.125f  // Match simulation
@@ -148,7 +149,10 @@ void generate_mesh(const char* volume_file, const char* output_base) {
         fprintf(stderr, "Error: Cannot open %s\n", volume_file);
         return;
     }
-    fread(volume.data(), 1, vol_size, f);
+    size_t bytes_read = fread(volume.data(), 1, vol_size, f);
+    if (bytes_read != vol_size) {
+        fprintf(stderr, "Warning: Only read %zu of %zu bytes\n", bytes_read, vol_size);
+    }
     fclose(f);
     
     printf("Volume loaded: %zu voxels (%zu MB)\n", vol_size, vol_size / (1024*1024));
