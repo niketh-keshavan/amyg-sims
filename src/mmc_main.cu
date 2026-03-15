@@ -16,6 +16,12 @@
 #include "mmc_kernel.cuh"
 #include "optical_properties.cuh"
 
+// Debug counters from kernel
+extern __device__ unsigned long long d_debug_photons_launched;
+extern __device__ unsigned long long d_debug_photons_to_air;
+extern __device__ unsigned long long d_debug_photons_in_radius;
+extern __device__ unsigned long long d_debug_photons_detected;
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -340,7 +346,54 @@ static void run_wavelength(
     printf("║ Batches: %-4d  Photons/batch: %-12llu              ║\n", 
            num_batches, (unsigned long long)photons_per_batch);
     printf("╚════════════════════════════════════════════════════════════╝\n");
-    printf("\n[ Starting simulation... ]\n");
+    
+    // DEBUG: Run small test with debug counters
+    printf("\n[ DEBUG: Running 1000 photon test to verify detection logic ]\n");
+    {
+        MMCConfig debug_cfg = cfg;
+        debug_cfg.num_photons = 1000;
+        mmc_init_rng<<<num_blocks, block_size>>>(d_rng, seed, total_threads);
+        CUDA_CHECK(cudaGetLastError());
+        
+        // Reset debug counters
+        unsigned long long zero = 0;
+        cudaMemcpyToSymbol(d_debug_photons_launched, &zero, sizeof(unsigned long long));
+        cudaMemcpyToSymbol(d_debug_photons_to_air, &zero, sizeof(unsigned long long));
+        cudaMemcpyToSymbol(d_debug_photons_in_radius, &zero, sizeof(unsigned long long));
+        cudaMemcpyToSymbol(d_debug_photons_detected, &zero, sizeof(unsigned long long));
+        
+        mmc_photon_kernel<<<num_blocks, block_size>>>(
+            dev_mesh, debug_cfg,
+            d_detectors, nd,
+            d_det_weight, d_det_pl, d_det_count,
+            d_tpsf, d_gated_w, d_gated_pl,
+            d_rng, true);  // debug_mode = true
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        
+        // Read back debug counters
+        unsigned long long dbg_launched, dbg_to_air, dbg_in_radius, dbg_detected;
+        cudaMemcpyFromSymbol(&dbg_launched, d_debug_photons_launched, sizeof(unsigned long long));
+        cudaMemcpyFromSymbol(&dbg_to_air, d_debug_photons_to_air, sizeof(unsigned long long));
+        cudaMemcpyFromSymbol(&dbg_in_radius, d_debug_photons_in_radius, sizeof(unsigned long long));
+        cudaMemcpyFromSymbol(&dbg_detected, d_debug_photons_detected, sizeof(unsigned long long));
+        
+        printf("  DEBUG RESULTS (1000 photon test):\n");
+        printf("    Photons launched:     %llu\n", dbg_launched);
+        printf("    Photons reached air:  %llu\n", dbg_to_air);
+        printf("    Photons in det radius:%llu\n", dbg_in_radius);
+        printf("    Photons detected:     %llu\n", dbg_detected);
+        
+        // Reset accumulators for real run
+        cudaMemset(d_det_weight, 0, det_w_sz);
+        cudaMemset(d_det_pl,     0, det_pl_sz);
+        cudaMemset(d_det_count,  0, det_cnt_sz);
+        cudaMemset(d_tpsf,       0, tpsf_sz);
+        cudaMemset(d_gated_w,    0, gw_sz);
+        cudaMemset(d_gated_pl,   0, gpl_sz);
+    }
+    
+    printf("\n[ Starting full simulation... ]\n");
     fflush(stdout);
     
     for (int batch = 0; batch < num_batches; batch++) {
@@ -359,7 +412,7 @@ static void run_wavelength(
             d_detectors, nd,
             d_det_weight, d_det_pl, d_det_count,
             d_tpsf, d_gated_w, d_gated_pl,
-            d_rng);
+            d_rng, false);  // debug_mode = false
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
         
