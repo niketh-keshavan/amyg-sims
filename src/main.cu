@@ -43,7 +43,7 @@ static void save_results_json(
     fprintf(f, "  \"voxel_size_mm\": %.2f,\n", config.dx);
     fprintf(f, "  \"grid_size\": [%d, %d, %d],\n", config.nx, config.ny, config.nz);
     fprintf(f, "  \"laser_power_W\": 0.4,\n");
-    fprintf(f, "  \"detector_radius_mm\": %.1f,\n", config.dx);  // from detector layout
+    fprintf(f, "  \"detector_radius_mm\": 1.69,\n");  // S14160-3050HS: 3x3mm square = 9mm² area
     fprintf(f, "  \"skull_model\": \"non-uniform (temporal ~2.5mm, vertex ~7mm)\",\n");
     fprintf(f, "  \"scattering_model\": \"mie_power_law\",\n");
     fprintf(f, "  \"tpsf_bins\": %d,\n", TPSF_BINS);
@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
     printf("\n");
     printf("  Scattering model: Mie power law + chromophore absorption\n");
     printf("  Skull model: non-uniform (temporal ~2.5mm, vertex ~7mm)\n");
-    printf("  Detector radius: 4mm (SiPM array)\n");
+    printf("  Detector: Hamamatsu S14160-3050HS SiPM (3x3mm active area)\n");
     printf("  Voxel size: 0.25 mm (high resolution)\n");
     printf("  TPSF bins: %d x %.0f ps = %.1f ns\n\n",
            TPSF_BINS, (double)TPSF_BIN_PS,
@@ -461,7 +461,7 @@ int main(int argc, char** argv) {
         fprintf(f, "  \"skull_temporal_thickness_mm\": 2.5,\n");
         fprintf(f, "  \"skull_vertex_thickness_mm\": 7.0,\n");
         fprintf(f, "  \"scattering_model\": \"mie_power_law\",\n");
-        fprintf(f, "  \"detector_radius_mm\": %.1f,\n", det_layout.det_radius);
+        fprintf(f, "  \"detector_radius_mm\": %.2f,\n", det_layout.det_radius);
         fprintf(f, "  \"wavelengths_nm\": [");
         for (int i = 0; i < (int)wavelengths.size(); i++) {
             if (i > 0) fprintf(f, ", ");

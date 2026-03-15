@@ -48,13 +48,19 @@ LASER_POWER_W = 1.0       # 1 W average power
 ANSI_MARGIN = 0.95        # keep irradiance at 95% of the strictest MPE
 MEAS_TIME_S = 120.0       # 2 minutes integration
 
-# Si-PMT quantum efficiency (wavelength-dependent)
+# Hamamatsu S14160-3050HS SiPM specifications
+# https://www.hamamatsu.com/us/en/product/optical-sensors/mppc/mppc_m-Series/S14160-3050HS.html
+DETECTOR_AREA_MM2 = 9.0   # 3mm x 3mm active area
+DETECTOR_RADIUS_MM = 1.69 # Equivalent circular radius: sqrt(9/pi)
+
+# SiPM PDE (Photon Detection Efficiency) - wavelength dependent
+# Typical values for S14160-3050HS at operating voltage
 DET_QE = {
-    "730nm": 0.30,   # 30% at 730nm (Si-PMT sweet spot)
-    "850nm": 0.15,   # 15% at 850nm (Si-PMT NIR falloff)
+    "730nm": 0.35,   # ~35% at 730nm (peak PDE region)
+    "850nm": 0.25,   # ~25% at 850nm (NIR falloff)
 }
 
-DARK_COUNT_RATE = 1000    # counts/s per detector
+DARK_COUNT_RATE = 1000    # counts/s per detector (typical at 25°C)
 
 
 def ansi_safe_beam_diameter_mm(power_w, wavelengths_nm, ansi_margin=0.95):

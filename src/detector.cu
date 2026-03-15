@@ -99,8 +99,9 @@ DetectorLayout default_detector_layout() {
         layout.angles_deg.push_back(-60.0f);
     }
 
-    // 4mm radius SiPM arrays
-    layout.det_radius = 4.0f;
+    // Hamamatsu S14160-3050HS: 3x3mm active area
+    // Equivalent circular radius for MC: sqrt(9/π) = 1.69mm
+    layout.det_radius = 1.69f;
 
     return layout;
 }
@@ -138,8 +139,9 @@ std::vector<Detector> build_detectors(const DetectorLayout& layout) {
         t2x /= t2mag; t2y /= t2mag; t2z /= t2mag;
     }
 
-    printf("Detector configuration (%d detectors, %.0fmm radius SiPM):\n",
-           (int)layout.separations_mm.size(), layout.det_radius);
+    printf("Detector configuration (%d detectors, 3x3mm SiPM S14160-3050HS):\n",
+           (int)layout.separations_mm.size());
+    printf("  Active area: 9 mm² (equivalent radius %.2f mm)\n", layout.det_radius);
     printf("  Source (raw): (%.1f, %.1f, %.1f) mm\n",
            layout.src_x, layout.src_y, layout.src_z);
     printf("  Primary dir: (%.3f, %.3f, %.3f)\n",

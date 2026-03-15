@@ -61,7 +61,10 @@ WL_KEYS = ["730nm", "850nm"]
 # System parameters
 LASER_POWER = 1.0  # 1W
 MEAS_TIME = 120.0
-DET_QE = {"730nm": 0.30, "850nm": 0.15}
+
+# Hamamatsu S14160-3050HS SiPM
+DETECTOR_AREA_MM2 = 9.0   # 3mm x 3mm
+DET_QE = {"730nm": 0.35, "850nm": 0.25}  # PDE at operating voltage
 DARK_RATE = 1000
 
 plt.rcParams.update({
