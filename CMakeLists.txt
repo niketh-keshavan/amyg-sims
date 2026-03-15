@@ -39,20 +39,11 @@ target_compile_options(mc_fnirs PRIVATE
 )
 
 # ── Mesh-Based MC (MMC) with MNI152 head model ────────────────────────────
-add_executable(mmc_fnirs
-    src/mmc_main.cu
-    src/mmc_kernel.cu
-    src/mmc_geometry.cu
-    src/optical_properties.cu
-)
-target_include_directories(mmc_fnirs PRIVATE include)
-if(TARGET CUDA::curand)
-    target_link_libraries(mmc_fnirs PRIVATE CUDA::curand)
-elseif(CURAND_LIB)
-    target_link_libraries(mmc_fnirs PRIVATE ${CURAND_LIB})
-else()
-    message(FATAL_ERROR "curand not found.")
+# This is built separately from the mmc/ subdirectory
+# See mmc/README.md for build instructions
+option(BUILD_MMC "Build the Mesh-based Monte Carlo (MMC) simulation" OFF)
+
+if(BUILD_MMC)
+    message(STATUS "Building MMC from mmc/ subdirectory")
+    add_subdirectory(mmc)
 endif()
-target_compile_options(mmc_fnirs PRIVATE
-    $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3>
-)
