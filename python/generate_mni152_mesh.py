@@ -210,6 +210,7 @@ def build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine):
 def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
     """
     Extract the outer scalp surface as a triangle mesh using marching cubes.
+    Applies morphological operations to ensure manifold surface.
     Returns:
         verts: (Nv, 3) float64 array in MNI mm
         faces: (Nf, 3) int32 array
@@ -222,8 +223,16 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
     # Binary head mask (anything non-air)
     head_bin = (labels > TISSUE_AIR).astype(np.float32)
 
+    # Ensure manifold: fill holes and close gaps
+    print("Cleaning surface mask (morphological operations)...")
+    head_bin = ndimage.binary_fill_holes(head_bin)
+    # Small opening to remove thin bridges, then closing to fill small holes
+    head_bin = ndimage.binary_opening(head_bin, iterations=1)
+    head_bin = ndimage.binary_closing(head_bin, iterations=2)
+    head_bin = ndimage.binary_fill_holes(head_bin)
+
     # Smooth to reduce staircase artifacts
-    head_smooth = ndimage.gaussian_filter(head_bin, sigma=smooth_sigma)
+    head_smooth = ndimage.gaussian_filter(head_bin.astype(np.float32), sigma=smooth_sigma)
 
     print("Extracting scalp surface (marching cubes)...")
     voxel_size = float(np.abs(affine[0,0]))
