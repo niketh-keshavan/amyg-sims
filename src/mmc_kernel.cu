@@ -371,13 +371,21 @@ __global__ void mmc_photon_kernel(
                 for (int d = 0; d < num_detectors; d++) {
                     float3 dp   = make_float3(detectors[d].x, detectors[d].y, detectors[d].z);
                     float3 diff = pos - dp;
-                    if (len2(diff) <= detectors[d].radius * detectors[d].radius) {
-                        record_detection(d, weight, tissue_opl, total_opl,
-                                         config,
-                                         det_weight, det_pathlength, det_count,
-                                         tpsf, gated_weight, gated_pathlength);
-                        break;   // count each photon once
-                    }
+                    if (len2(diff) > detectors[d].radius * detectors[d].radius)
+                        continue;  // outside detector area
+                    
+                    // Check angular acceptance: photon direction vs detector surface normal
+                    // Photon must be coming from inside the head (aligned with normal)
+                    float3 det_n = make_float3(detectors[d].nx, detectors[d].ny, detectors[d].nz);
+                    float cos_theta = dot(dir, det_n);
+                    if (cos_theta < detectors[d].n_critical)
+                        continue;  // rejected: exceeds critical angle (grazing exit)
+                    
+                    record_detection(d, weight, tissue_opl, total_opl,
+                                     config,
+                                     det_weight, det_pathlength, det_count,
+                                     tpsf, gated_weight, gated_pathlength);
+                    break;   // count each photon once
                 }
                 break;   // terminate photon
             }

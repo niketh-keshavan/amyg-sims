@@ -83,14 +83,62 @@ def load_results(data_dir):
     return results
 
 
-def load_tpsf(data_dir, wavelength_key):
+def gaussian_irf(fwhm_ps, bin_width_ps):
+    """Generate a Gaussian IRF kernel normalized to unit area."""
+    sigma = fwhm_ps / (2.0 * np.sqrt(2.0 * np.log(2.0)))  # sigma from FWHM
+    # Use ±4 sigma range for the kernel
+    half_width = int(np.ceil(4 * sigma / bin_width_ps))
+    x = np.arange(-half_width, half_width + 1) * bin_width_ps
+    kernel = np.exp(-0.5 * (x / sigma) ** 2)
+    return kernel / np.sum(kernel)  # normalize to unit area
+
+
+def convolve_tpsf_with_irf(tpsf, fwhm_ps=100.0, bin_width_ps=10.0):
+    """
+    Convolve TPSF with a Gaussian IRF.
+    
+    Parameters:
+    -----------
+    tpsf : ndarray, shape (n_dets, n_bins)
+        Raw TPSF histogram
+    fwhm_ps : float
+        IRF full-width at half-maximum in picoseconds (default: 100 ps)
+    bin_width_ps : float
+        TPSF bin width in picoseconds (default: 10 ps)
+    
+    Returns:
+    --------
+    ndarray
+        Convolved TPSF with same shape as input
+    """
+    if tpsf is None or tpsf.shape[1] == 0:
+        return tpsf
+    
+    kernel = gaussian_irf(fwhm_ps, bin_width_ps)
+    
+    # Convolve each detector's TPSF
+    convolved = np.zeros_like(tpsf)
+    for i in range(tpsf.shape[0]):
+        # mode='same' keeps the output size consistent
+        convolved[i, :] = np.convolve(tpsf[i, :], kernel, mode='same')
+    
+    return convolved
+
+
+def load_tpsf(data_dir, wavelength_key, apply_irf=True, irf_fwhm_ps=100.0):
     fpath = data_dir / f"tpsf_{wavelength_key}.bin"
     if not fpath.exists():
         return None
     data = np.fromfile(fpath, dtype=np.float64)
     n_bins = 512
     n_dets = len(data) // n_bins
-    return data.reshape(n_dets, n_bins)
+    tpsf = data.reshape(n_dets, n_bins)
+    
+    if apply_irf:
+        # TPSF bin width is 10 ps (TPSF_BIN_PS from constants)
+        tpsf = convolve_tpsf_with_irf(tpsf, fwhm_ps=irf_fwhm_ps, bin_width_ps=10.0)
+    
+    return tpsf
 
 
 def photons_per_second(power_W, wavelength_m):
@@ -557,6 +605,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="fNIRS MC -- TD-Gated Analysis (optimized config)")
     parser.add_argument("--data-dir", type=str, default="../results")
+    parser.add_argument("--no-irf", action="store_true", 
+                        help="Disable IRF convolution (use delta-function response)")
+    parser.add_argument("--irf-fwhm", type=float, default=100.0, 
+                        help="IRF FWHM in picoseconds (default: 100 ps)")
     args = parser.parse_args()
     data_dir = Path(args.data_dir)
 
@@ -565,6 +617,10 @@ def main():
     print(f"  Laser: {LASER_POWER_W*1e3:.0f} mW ({BEAM_DIAMETER_MM:.0f}mm beam) | "
           f"Det: Si-PMT ({DET_QE[WL_KEYS[0]]*100:.0f}%/{DET_QE[WL_KEYS[1]]*100:.0f}%) | "
           f"Dark: {DARK_COUNT_RATE} cps")
+    if not args.no_irf:
+        print(f"  IRF: Gaussian {args.irf_fwhm:.0f}ps FWHM (realistic temporal blurring)")
+    else:
+        print(f"  IRF: Delta-function (ideal response)")
     print("=" * 80)
 
     results = load_results(data_dir)
@@ -575,8 +631,9 @@ def main():
         print("Run the simulator with both wavelengths and copy fresh data before analysis.")
         sys.exit(1)
 
-    tpsf_0 = load_tpsf(data_dir, WL_KEYS[0])
-    tpsf_1 = load_tpsf(data_dir, WL_KEYS[1])
+    apply_irf = not args.no_irf
+    tpsf_0 = load_tpsf(data_dir, WL_KEYS[0], apply_irf=apply_irf, irf_fwhm_ps=args.irf_fwhm)
+    tpsf_1 = load_tpsf(data_dir, WL_KEYS[1], apply_irf=apply_irf, irf_fwhm_ps=args.irf_fwhm)
 
     for key, tpsf in [(WL_KEYS[0], tpsf_0), (WL_KEYS[1], tpsf_1)]:
         if tpsf is not None:

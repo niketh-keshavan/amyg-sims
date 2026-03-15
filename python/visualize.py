@@ -23,6 +23,7 @@ Usage:
 import json
 import argparse
 import numpy as np
+from scipy import signal
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -74,7 +75,50 @@ plt.rcParams.update({
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
-def load_data(data_dir):
+def gaussian_irf(fwhm_ps, bin_width_ps):
+    """Generate a Gaussian IRF kernel normalized to unit area."""
+    sigma = fwhm_ps / (2.0 * np.sqrt(2.0 * np.log(2.0)))  # sigma from FWHM
+    # Use ±4 sigma range for the kernel
+    half_width = int(np.ceil(4 * sigma / bin_width_ps))
+    x = np.arange(-half_width, half_width + 1) * bin_width_ps
+    kernel = np.exp(-0.5 * (x / sigma) ** 2)
+    return kernel / np.sum(kernel)  # normalize to unit area
+
+
+def convolve_tpsf_with_irf(tpsf, fwhm_ps=100.0, bin_width_ps=10.0):
+    """
+    Convolve TPSF with a Gaussian IRF to simulate realistic instrument response.
+    
+    Parameters:
+    -----------
+    tpsf : ndarray, shape (n_dets, n_bins)
+        Raw TPSF histogram
+    fwhm_ps : float
+        IRF full-width at half-maximum in picoseconds (default: 100 ps)
+    bin_width_ps : float
+        TPSF bin width in picoseconds (default: 10 ps)
+    
+    Returns:
+    --------
+    ndarray
+        Convolved TPSF with same shape as input, providing realistic
+        temporal blurring and cross-talk between early/late gates.
+    """
+    if tpsf is None or tpsf.shape[1] == 0:
+        return tpsf
+    
+    kernel = gaussian_irf(fwhm_ps, bin_width_ps)
+    
+    # Convolve each detector's TPSF
+    convolved = np.zeros_like(tpsf)
+    for i in range(tpsf.shape[0]):
+        # mode='same' keeps the output size consistent
+        convolved[i, :] = np.convolve(tpsf[i, :], kernel, mode='same')
+    
+    return convolved
+
+
+def load_data(data_dir, apply_irf=True, irf_fwhm_ps=100.0):
     meta_path = data_dir / "volume_meta.json"
     with open(meta_path) as f:
         meta = json.load(f)
@@ -101,7 +145,12 @@ def load_data(data_dir):
         fp = data_dir / f"tpsf_{wl}.bin"
         if fp.exists():
             raw = np.fromfile(fp, dtype=np.float64)
-            tpsf[wl] = raw.reshape(len(raw) // 512, 512)
+            tpsf_raw = raw.reshape(len(raw) // 512, 512)
+            # Apply realistic IRF convolution for temporal blurring
+            if apply_irf:
+                tpsf[wl] = convolve_tpsf_with_irf(tpsf_raw, fwhm_ps=irf_fwhm_ps, bin_width_ps=10.0)
+            else:
+                tpsf[wl] = tpsf_raw
 
     paths = {}
     MAX_PATH_STEPS = 2048
@@ -546,6 +595,95 @@ def plot_integration_curve(results, output_dir):
 
 
 # ---------------------------------------------------------------------------
+# Colored noise generation with physiological components
+# ---------------------------------------------------------------------------
+def generate_colored_noise(n_samples, dt, noise_std, seed=42):
+    """
+    Generate colored noise with 1/f baseline and physiological peaks.
+    
+    Components:
+    - 1/f pink noise baseline
+    - Cardiac pulsatility (~1.0 Hz)
+    - Respiration (~0.3 Hz)  
+    - Mayer waves (~0.1 Hz)
+    
+    Parameters:
+    -----------
+    n_samples : int
+        Number of time samples
+    dt : float
+        Time step in seconds
+    noise_std : float
+        Target standard deviation of the noise
+    seed : int
+        Random seed for reproducibility
+        
+    Returns:
+    --------
+    ndarray
+        Colored noise time series with physiological components
+    """
+    rng = np.random.default_rng(seed)
+    
+    # Frequency axis
+    freqs = np.fft.rfftfreq(n_samples, dt)
+    n_freqs = len(freqs)
+    
+    # Create amplitude spectrum
+    # Start with 1/f (pink noise) baseline: amplitude ~ 1/sqrt(f)
+    # For f=0 (DC), use a small constant
+    amplitude = np.zeros(n_freqs)
+    amplitude[0] = 0.1  # Small DC component
+    amplitude[1:] = 1.0 / np.sqrt(freqs[1:])
+    
+    # Normalize to unit variance before adding peaks
+    # Parseval's theorem: sum of power in freq = sum of power in time
+    # Power = amplitude^2, so we need to scale amplitudes
+    
+    # Add physiological peaks as Gaussian bumps in frequency domain
+    def add_peak(freq_center, amplitude_factor, width_hz=0.05):
+        """Add a Gaussian peak in frequency domain."""
+        peak = amplitude_factor * np.exp(-0.5 * ((freqs - freq_center) / width_hz) ** 2)
+        amplitude += peak
+    
+    # Mayer waves: ~0.1 Hz (autonomic nervous system oscillations)
+    # Relative amplitude: strong (low frequency)
+    add_peak(0.10, 2.0, width_hz=0.03)
+    
+    # Respiration: ~0.3 Hz (18 breaths/min typical)
+    # Relative amplitude: moderate
+    add_peak(0.30, 1.5, width_hz=0.05)
+    
+    # Cardiac pulsatility: ~1.0 Hz (60 bpm typical)
+    # Relative amplitude: moderate (higher freq, but strong physiological signal)
+    add_peak(1.00, 1.2, width_hz=0.15)
+    
+    # Also add 2nd harmonic of cardiac at ~2 Hz (weaker)
+    add_peak(2.00, 0.6, width_hz=0.20)
+    
+    # Convert amplitude spectrum to complex spectrum with random phases
+    # Power = amplitude^2, so we use amplitude as magnitude
+    phases = rng.uniform(0, 2 * np.pi, n_freqs)
+    spectrum = amplitude * np.exp(1j * phases)
+    
+    # Make the result real-valued by ensuring conjugate symmetry
+    # rfft already handles this, we just need to ensure DC and Nyquist are real
+    spectrum[0] = np.real(spectrum[0])
+    if n_samples % 2 == 0 and n_freqs > 1:
+        spectrum[-1] = np.real(spectrum[-1])
+    
+    # Inverse FFT to get time series
+    noise = np.fft.irfft(spectrum, n=n_samples)
+    
+    # Normalize to target standard deviation
+    current_std = np.std(noise)
+    if current_std > 0:
+        noise = noise * (noise_std / current_std)
+    
+    return noise
+
+
+# ---------------------------------------------------------------------------
 # 9. Block design expected signal
 # ---------------------------------------------------------------------------
 def plot_block_design(results, output_dir):
@@ -610,9 +748,12 @@ def plot_block_design(results, output_dir):
     noise_std_hbo = best_sds_min / np.sqrt(dt) if best_sds_min < 1e5 else 10
     noise_std_hbr = noise_std_hbo * 3
 
-    np.random.seed(42)
-    hbo_meas = hbo_true + np.random.normal(0, noise_std_hbo, len(t))
-    hbr_meas = hbr_true + np.random.normal(0, noise_std_hbr, len(t))
+    # Generate colored noise with physiological components (1/f + peaks at 0.1, 0.3, 1.0 Hz)
+    hbo_noise = generate_colored_noise(len(t), dt, noise_std_hbo, seed=42)
+    hbr_noise = generate_colored_noise(len(t), dt, noise_std_hbr, seed=43)
+    
+    hbo_meas = hbo_true + hbo_noise
+    hbr_meas = hbr_true + hbr_noise
 
     fig, axes = plt.subplots(2, 1, figsize=(16, 8), sharex=True)
 
@@ -645,6 +786,76 @@ def plot_block_design(results, output_dir):
 
     plt.tight_layout()
     plt.savefig(output_dir / "09_block_design_signal.png", dpi=150, bbox_inches="tight")
+    plt.close()
+    
+    # Also save a plot showing the noise power spectrum
+    _plot_noise_spectrum(hbo_noise, hbr_noise, dt, output_dir)
+
+
+def _plot_noise_spectrum(hbo_noise, hbr_noise, dt, output_dir):
+    """
+    Plot the power spectrum of the colored noise to visualize physiological components.
+    Shows 1/f baseline with peaks at Mayer waves (~0.1 Hz), respiration (~0.3 Hz),
+    and cardiac pulsatility (~1.0 Hz).
+    """
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    
+    # Compute power spectra using Welch's method
+    fs = 1.0 / dt
+    freqs_hbo, psd_hbo = signal.welch(hbo_noise, fs, nperseg=min(256, len(hbo_noise)//4))
+    freqs_hbr, psd_hbr = signal.welch(hbr_noise, fs, nperseg=min(256, len(hbr_noise)//4))
+    
+    # Plot HbO spectrum
+    ax = axes[0]
+    ax.semilogy(freqs_hbo, psd_hbo, 'r-', linewidth=1.5, alpha=0.8, label='HbO noise PSD')
+    
+    # Annotate physiological peaks
+    peaks = [
+        (0.10, 'Mayer waves\n(~0.1 Hz)', 'purple'),
+        (0.30, 'Respiration\n(~0.3 Hz)', 'green'),
+        (1.00, 'Cardiac\n(~1.0 Hz)', 'blue'),
+    ]
+    
+    for freq, label, color in peaks:
+        ax.axvline(freq, color=color, linestyle='--', linewidth=1.5, alpha=0.7)
+        # Find y position for annotation
+        idx = np.argmin(np.abs(freqs_hbo - freq))
+        y_pos = psd_hbo[idx] if idx < len(psd_hbo) else np.max(psd_hbo) * 0.5
+        ax.annotate(label, xy=(freq, y_pos), xytext=(freq + 0.15, y_pos * 2),
+                   fontsize=9, color=color,
+                   arrowprops=dict(arrowstyle='->', color=color, alpha=0.7))
+    
+    ax.set_xlabel('Frequency [Hz]')
+    ax.set_ylabel('Power Spectral Density [uM²/Hz]')
+    ax.set_title('HbO Colored Noise Spectrum')
+    ax.set_xlim(0, 3.0)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    
+    # Plot HbR spectrum
+    ax = axes[1]
+    ax.semilogy(freqs_hbr, psd_hbr, 'b-', linewidth=1.5, alpha=0.8, label='HbR noise PSD')
+    
+    for freq, label, color in peaks:
+        ax.axvline(freq, color=color, linestyle='--', linewidth=1.5, alpha=0.7)
+        idx = np.argmin(np.abs(freqs_hbr - freq))
+        y_pos = psd_hbr[idx] if idx < len(psd_hbr) else np.max(psd_hbr) * 0.5
+        ax.annotate(label, xy=(freq, y_pos), xytext=(freq + 0.15, y_pos * 2),
+                   fontsize=9, color=color,
+                   arrowprops=dict(arrowstyle='->', color=color, alpha=0.7))
+    
+    ax.set_xlabel('Frequency [Hz]')
+    ax.set_ylabel('Power Spectral Density [uM²/Hz]')
+    ax.set_title('HbR Colored Noise Spectrum')
+    ax.set_xlim(0, 3.0)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    
+    fig.suptitle('Physiological Noise Power Spectra (1/f baseline + cardiac/resp/Mayer peaks)', 
+                 fontsize=12, y=1.02)
+    plt.tight_layout()
+    plt.savefig(output_dir / "09b_noise_spectrum.png", dpi=150, bbox_inches="tight")
     plt.close()
 
 
@@ -873,6 +1084,8 @@ def main():
     parser = argparse.ArgumentParser(description="fNIRS MC 730/850nm Visualization")
     parser.add_argument("--data-dir", type=str, default="../data/730-850")
     parser.add_argument("--output-dir", type=str, default="../figures/730-850")
+    parser.add_argument("--no-irf", action="store_true", help="Disable IRF convolution (use delta-function response)")
+    parser.add_argument("--irf-fwhm", type=float, default=100.0, help="IRF FWHM in picoseconds (default: 100 ps)")
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -880,7 +1093,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("Loading 730/850nm data...")
-    vol, fluence, results, tpsf, meta, paths = load_data(data_dir)
+    vol, fluence, results, tpsf, meta, paths = load_data(data_dir, apply_irf=not args.no_irf, irf_fwhm_ps=args.irf_fwhm)
     print(f"  Volume: {'loaded' if vol is not None else 'skipped (large grid)'}")
     print(f"  Fluence: {', '.join(fluence.keys()) if fluence else 'none'}")
     print(f"  TPSF: {', '.join(f'{k}: {v.shape}' for k, v in tpsf.items())}")
@@ -916,6 +1129,7 @@ def main():
 
     plot_block_design(results, output_dir)
     print("  09_block_design_signal.png")
+    print("  09b_noise_spectrum.png")
 
     if paths:
         plot_photon_paths(paths, results, meta, output_dir)

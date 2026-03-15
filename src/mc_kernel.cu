@@ -117,16 +117,26 @@ __device__ float fresnel_reflect(float n_in, float n_out, float cos_i) {
 
 // ---------------------------------------------------------------------------
 // Check if photon exits at a detector
+// Rejects photons that exceed the critical angle (dot product < cos_critical)
 // ---------------------------------------------------------------------------
-__device__ int check_detectors(float x, float y, float z) {
+__device__ int check_detectors(float x, float y, float z, float ddx, float ddy, float ddz) {
     for (int i = 0; i < d_n_dets; i++) {
-        float ddx = x - d_dets[i].x;
-        float ddy = y - d_dets[i].y;
-        float ddz = z - d_dets[i].z;
-        float dist2 = ddx * ddx + ddy * ddy + ddz * ddz;
+        // Check spatial acceptance (within detector radius)
+        float diffx = x - d_dets[i].x;
+        float diffy = y - d_dets[i].y;
+        float diffz = z - d_dets[i].z;
+        float dist2 = diffx * diffx + diffy * diffy + diffz * diffz;
         float r = d_dets[i].radius;
-        if (dist2 <= r * r)
-            return i;
+        if (dist2 > r * r)
+            continue;  // outside detector area
+        
+        // Check angular acceptance: photon direction vs detector surface normal
+        // Photon must be coming from inside the head (aligned with normal)
+        float dot_product = ddx * d_dets[i].nx + ddy * d_dets[i].ny + ddz * d_dets[i].nz;
+        if (dot_product < d_dets[i].n_critical)
+            continue;  // rejected: exceeds critical angle (grazing exit)
+        
+        return i;  // accepted
     }
     return -1;
 }
@@ -282,7 +292,7 @@ __global__ void mc_kernel(
             uint8_t tissue = get_tissue(volume, px, py, pz);
 
             if (tissue == TISSUE_AIR) {
-                int det_id = check_detectors(px, py, pz);
+                int det_id = check_detectors(px, py, pz, ddx, ddy, ddz);
                 if (det_id >= 0) {
                     record_detection(det_id, weight, total_pl, ppl,
                         det_weight, det_pathlength, det_partial_pl, det_count,
@@ -358,7 +368,7 @@ __global__ void mc_kernel(
                     continue;
                 }
                 // Photon transmitted: check detectors
-                int det_id = check_detectors(px, py, pz);
+                int det_id = check_detectors(px, py, pz, ddx, ddy, ddz);
                 if (det_id >= 0) {
                     record_detection(det_id, weight, total_pl, ppl,
                         det_weight, det_pathlength, det_partial_pl, det_count,
