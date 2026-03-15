@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "fNIRS Monte Carlo Simulation for Amygdala Oxygenation"
+abstract: >
+  GPU-accelerated Monte Carlo photon transport simulation for evaluating 
+  the feasibility of measuring amygdala hemodynamic activity using 
+  functional near-infrared spectroscopy (fNIRS). Compares continuous-wave, 
+  time-domain, frequency-domain, and chirp-correlated measurement modalities 
+  in a realistic five-layer ellipsoidal adult head model.
+authors:
+  - family-names: "Your Name"
+    given-names: "Your Name"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/yourusername/amyg-fnirs-mc"
+license: MIT
+keywords:
+  - fNIRS
+  - Monte Carlo
+  - photon transport
+  - amygdala
+  - neuroimaging
+  - CUDA
+  - GPU
+  - time-domain
+  - diffuse optics
+preferred-citation:
+  type: article
+  title: "Feasibility of Time-Domain fNIRS for Amygdala Hemodynamic Monitoring: A Monte Carlo Simulation Study"
+  authors:
+    - family-names: "Your Name"
+      given-names: "Your Name"
+  journal: "Journal Name"
+  year: 2026
+  volume: 1
+  issue: 1
+  pages: "1-15"
+  doi: "10.xxxx/xxxxx"
