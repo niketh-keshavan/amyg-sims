@@ -22,6 +22,7 @@ import argparse
 import numpy as np
 import sys
 from pathlib import Path
+from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
 # Physical constants and extinction coefficients (Cope 1991 / Matcher 1995)
@@ -81,7 +82,7 @@ BEAM_DIAMETER_MM = ansi_safe_beam_diameter_mm(LASER_POWER_W, WAVELENGTHS_NM, ANS
 
 def load_results(data_dir):
     results = {}
-    for wl in WL_KEYS:
+    for wl in tqdm(WL_KEYS, desc="Loading results", unit="wl"):
         fpath = data_dir / f"results_{wl}.json"
         if fpath.exists():
             with open(fpath) as f:
@@ -167,7 +168,7 @@ def td_sensitivity(results):
               f"{'Photons':>12s}  {'AmygPL':>8s}  {'Sens%':>8s}  {'TotalPL':>8s}")
         print("  " + "-" * 70)
 
-        for det in r["detectors"]:
+        for det in tqdm(r["detectors"], desc=f"Processing {wl_key}", unit="det", leave=False):
             gates = det.get("time_gates", [])
             best_gate = -1
             best_sens = 0
@@ -341,7 +342,7 @@ def mbll_multi_channel(results):
     all_det_info = []  # list of (det_id, sds, angle, gate_measurements)
     n_dets = len(results[WL_KEYS[0]]["detectors"])
 
-    for det_idx in range(n_dets):
+    for det_idx in tqdm(range(n_dets), desc="Processing detectors", unit="det", leave=False):
         det0 = results[WL_KEYS[0]]["detectors"][det_idx]
         det1 = results[WL_KEYS[1]]["detectors"][det_idx]
         sds = det0["sds_mm"]
@@ -455,7 +456,7 @@ def mbll_multi_channel(results):
     print(f"\n  Min detectable vs integration time:")
     print(f"  {'Time':>8s}  {'HbO [uM]':>10s}  {'HbR [uM]':>10s}  {'HbO status':>12s}  {'HbR status':>12s}")
     print("  " + "-" * 55)
-    for t in [1, 5, 10, 15, 30, 60, 120, 300]:
+    for t in tqdm([1, 5, 10, 15, 30, 60, 120, 300], desc="Integration times", unit="time", leave=False):
         hbo_t = min_hbo * np.sqrt(MEAS_TIME_S / t)
         hbr_t = min_hbr * np.sqrt(MEAS_TIME_S / t)
         label = f"{t}s" if t < 60 else f"{t//60}m"
@@ -503,7 +504,7 @@ def block_design(multi_result, best_configs):
           f"{'1uM':>7s}  {'2uM':>7s}  {'3uM':>7s}  {'5uM':>7s}  {'verdict':>10s}")
     print("  " + "-" * 68)
 
-    for sds, cfg in best_configs:
+    for sds, cfg in tqdm(best_configs, desc="Computing SNR", unit="SDS", leave=False):
         trial_min = cfg['min_hbo'] * np.sqrt(MEAS_TIME_S / trial_dur)
         avg_min = trial_min / trial_gain
 

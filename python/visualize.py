@@ -29,6 +29,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, LogNorm
 from pathlib import Path
+from tqdm import tqdm
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -263,7 +264,7 @@ def plot_tpsf(results, tpsf, output_dir):
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-    for ax, wl_key in zip(axes, WL_KEYS):
+    for ax, wl_key in tqdm(list(zip(axes, WL_KEYS)), desc="TPSF curves", unit="wl"):
         if wl_key not in tpsf:
             continue
         r = results[wl_key]
@@ -275,7 +276,7 @@ def plot_tpsf(results, tpsf, output_dir):
         sds_vals = [d["sds_mm"] for _, d in primary]
         sds_min, sds_max = min(sds_vals), max(sds_vals)
 
-        for idx, det in primary:
+        for idx, det in tqdm(list(primary), desc=f"TPSF {wl_key}", unit="det", leave=False):
             t = data[idx]
             if t.sum() <= 0:
                 continue
@@ -316,7 +317,7 @@ def plot_sensitivity_heatmap(results, output_dir):
         matrix = np.zeros((len(dets), n_gates))
         sds_labels = []
 
-        for i, det in enumerate(dets):
+        for i, det in enumerate(tqdm(dets, desc=f"Sensitivity {wl_key}", unit="det", leave=False)):
             sds_labels.append(f"{det['sds_mm']:.0f}")
             gates = det.get("time_gates", [])
             for g_idx, gate in enumerate(gates):
@@ -364,7 +365,7 @@ def plot_gate_counts(results, output_dir):
         width = 0.08
         for g_idx in range(len(GATE_LABELS)):
             counts = []
-            for det in dets:
+            for det in tqdm(dets, desc=f"Gate counts {wl_key}", unit="det", leave=False):
                 gates = det.get("time_gates", [])
                 cnt = gates[g_idx]["detected_photons"] if g_idx < len(gates) else 0
                 counts.append(max(cnt, 0.5))
@@ -403,7 +404,7 @@ def plot_td_snr(results, output_dir):
 
         snr_vals = []
         gate_used = []
-        for det in dets:
+        for det in tqdm(dets, desc=f"SNR {wl_key}", unit="det", leave=False):
             best_snr = 0
             best_g = -1
             for g_idx, gate in enumerate(det.get("time_gates", [])):
@@ -456,7 +457,7 @@ def plot_min_detectable(results, output_dir):
     min_hbr_vals = []
     best_gates = []
 
-    for d730, d850 in zip(dets730, dets850):
+    for d730, d850 in tqdm(list(zip(dets730, dets850)), desc="Computing detectability", unit="det", leave=False):
         sds = d730["sds_mm"]
         best_hbo = float('inf')
         best_hbr = float('inf')
@@ -542,7 +543,7 @@ def plot_integration_curve(results, output_dir):
     sds_all = [d["sds_mm"] for d in dets730]
     sds_min, sds_max = min(sds_all), max(sds_all)
 
-    for d730, d850 in zip(dets730, dets850):
+    for d730, d850 in tqdm(list(zip(dets730, dets850)), desc="Finding best SDS", unit="det", leave=False):
         sds = d730["sds_mm"]
 
         best_min_1s = float('inf')
@@ -877,7 +878,7 @@ def plot_photon_paths(paths, results, meta, output_dir):
     cy = meta["ny"] * dx / 2
     cz = meta["nz"] * dx / 2
 
-    for wl_key in paths:
+    for wl_key in tqdm(list(paths.keys()), desc="Photon paths", unit="wl"):
         pdata = paths[wl_key]
         det_ids = pdata["det_ids"]
         path_lens = pdata["path_lens"]
@@ -914,7 +915,7 @@ def plot_photon_paths(paths, results, meta, output_dir):
             indices = rng.choice(n_paths, max_show, replace=False) if n_paths > max_show else np.arange(n_paths)
 
             amyg_count = 0
-            for idx in indices:
+            for idx in tqdm(list(indices), desc="Plotting paths", unit="path", leave=False):
                 nsteps = path_lens[idx]
                 pts = positions[idx, :nsteps, :]
                 ax_r = (pts[:, 0] - cx - 24) / 5
@@ -961,7 +962,7 @@ def plot_cw_vs_td(results, output_dir):
         td_best_amyg = []
         td_best_gate = []
 
-        for det in dets:
+        for det in tqdm(dets, desc=f"CW vs TD {wl_key}", unit="det", leave=False):
             cw_amyg.append(det["partial_pathlength_mm"].get("amygdala", 0))
             gates = det.get("time_gates", [])
             best_a = 0
