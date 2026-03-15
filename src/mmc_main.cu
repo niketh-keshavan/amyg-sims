@@ -40,9 +40,17 @@
 // Source: right temporal bone, projecting from amygdala center (+24,-2,-20)
 // Primary axis: inferior-posterior along temporal surface
 // ---------------------------------------------------------------------------
-static std::vector<Detector> build_mni152_detectors(const float src[3], float det_radius)
+static std::vector<Detector> build_mni152_detectors(const float src[3], float det_radius, 
+                                                       const float bbox_min[3], const float bbox_max[3])
 {
     std::vector<Detector> dets;
+
+    // Head ellipsoid radii from bbox
+    float rx = (bbox_max[0] - bbox_min[0]) / 2.0f * 0.95f;  // 95% of half-extent
+    float ry = (bbox_max[1] - bbox_min[1]) / 2.0f * 0.95f;
+    float rz = (bbox_max[2] - bbox_min[2]) / 2.0f * 0.95f;
+    
+    printf("  Head ellipsoid radii: (%.1f, %.1f, %.1f) mm\n", rx, ry, rz);
 
     // Source-detector axis along scalp (inferior-posterior temporal direction in MNI)
     // Approximate tangent on temporal scalp from MNI source position
@@ -65,30 +73,44 @@ static std::vector<Detector> build_mni152_detectors(const float src[3], float de
     auto add = [&](float sds, float ang_deg) {
         float ang = ang_deg * (float)M_PI / 180.f;
         float ca = cosf(ang), sa = sinf(ang);
+        
+        // Raw detector position (offset from source)
+        float dx = src[0] + sds*(ca*axis[0] + sa*lat[0]);
+        float dy = src[1] + sds*(ca*axis[1] + sa*lat[1]);
+        float dz = src[2] + sds*(ca*axis[2] + sa*lat[2]);
+        
+        // Project onto ellipsoid surface
+        // Find intersection of ray from center through (dx,dy,dz) with ellipsoid
+        float ex = dx / rx, ey = dy / ry, ez = dz / rz;
+        float e_len = sqrtf(ex*ex + ey*ey + ez*ez);
+        if (e_len > 0.01f) {
+            // Scale to ellipsoid surface
+            float scale = 1.0f / e_len;
+            dx = dx * scale;
+            dy = dy * scale;
+            dz = dz * scale;
+        }
+        
         Detector d;
-        d.x = src[0] + sds*(ca*axis[0] + sa*lat[0]);
-        d.y = src[1] + sds*(ca*axis[1] + sa*lat[1]);
-        d.z = src[2] + sds*(ca*axis[2] + sa*lat[2]);
+        d.x = dx;
+        d.y = dy;
+        d.z = dz;
         d.radius = det_radius;
         d.id = id++;
         
-        // Surface normal: radial direction from head center (MNI origin)
-        // Head ellipsoid approx: 78mm x 95mm x 85mm
-        // Normal is direction from center scaled by inverse ellipsoid radii
-        float rx = d.x / 78.0f, ry = d.y / 95.0f, rz = d.z / 85.0f;
-        float r_mag = sqrtf(rx*rx + ry*ry + rz*rz);
-        if (r_mag > 1e-6f) {
-            d.nx = rx / r_mag;
-            d.ny = ry / r_mag;
-            d.nz = rz / r_mag;
+        // Surface normal: radial direction from head center
+        float nx = d.x / rx, ny = d.y / ry, nz = d.z / rz;
+        float n_mag = sqrtf(nx*nx + ny*ny + nz*nz);
+        if (n_mag > 1e-6f) {
+            d.nx = nx / n_mag;
+            d.ny = ny / n_mag;
+            d.nz = nz / n_mag;
         } else {
             d.nx = d.ny = 0.0f; d.nz = 1.0f;
         }
         
-        // Critical angle: photons with dot(dir, normal) < n_critical are rejected
-        // Using 0.0 means accept all photons exiting toward detector (full hemisphere)
-        // n_air / n_scalp ≈ 0.714 would be ~44 degrees - too restrictive
-        d.n_critical = 0.0f;  // Accept all photons within detector radius
+        // Accept all photons
+        d.n_critical = 0.0f;
         
         dets.push_back(d);
     };
@@ -503,9 +525,10 @@ int main(int argc, char* argv[])
         amyg_center[2] + 55.f * src_dir_unnorm[2] / src_len
     };
     
-    // Build detectors relative to ACTUAL source position
-    std::vector<Detector> dets = build_mni152_detectors(src_pos, 4.0f);
-    printf("Built %d detectors around source (%.1f, %.1f, %.1f)\n", 
+    // Build detectors relative to ACTUAL source position, projected onto surface
+    std::vector<Detector> dets = build_mni152_detectors(src_pos, 4.0f, 
+                                                         host_mesh.bbox_min, host_mesh.bbox_max);
+    printf("Built %d detectors around source (%.1f, %.1f, %.1f) - projected to surface\n", 
            (int)dets.size(), src_pos[0], src_pos[1], src_pos[2]);
     
     // Debug: Show first few detector positions
