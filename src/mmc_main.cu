@@ -305,21 +305,29 @@ static void run_wavelength(
     printf("Launching %d blocks × %d threads = %d threads  (%llu photons)\n",
            num_blocks, block_size, total_threads, (unsigned long long)num_photons);
 
-    // Progress bar setup
-    int num_batches = 20;
+    // Progress bar setup - use smaller batches for more frequent updates
+    int num_batches = 100;  // More batches = more frequent updates
     uint64_t photons_per_batch = (num_photons + num_batches - 1) / num_batches;
-    cfg.num_photons = photons_per_batch;  // photons per batch
     
     auto t_start = std::chrono::high_resolution_clock::now();
     
+    printf("\nProgress (batches: %d, photons/batch: %llu):\n", num_batches, (unsigned long long)photons_per_batch);
+    printf("  [                              ]   0.0%%  Starting...");
+    fflush(stdout);
+    
     for (int batch = 0; batch < num_batches; batch++) {
+        // Update config for this batch
+        MMCConfig batch_cfg = cfg;
+        batch_cfg.num_photons = photons_per_batch;
+        
         // Update seed for each batch
         uint64_t batch_seed = seed + batch;
         mmc_init_rng<<<num_blocks, block_size>>>(d_rng, batch_seed, total_threads);
+        CUDA_CHECK(cudaGetLastError());
         
         // Launch batch
         mmc_photon_kernel<<<num_blocks, block_size>>>(
-            dev_mesh, cfg,
+            dev_mesh, batch_cfg,
             d_detectors, nd,
             d_det_weight, d_det_pl, d_det_count,
             d_tpsf, d_gated_w, d_gated_pl,
@@ -327,25 +335,30 @@ static void run_wavelength(
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
         
-        // Progress update
-        auto t_now = std::chrono::high_resolution_clock::now();
-        double elapsed = std::chrono::duration<double>(t_now - t_start).count();
-        double pct = 100.0 * (batch + 1) / num_batches;
-        uint64_t photons_done = (uint64_t)(batch + 1) * photons_per_batch;
-        double rate = photons_done / elapsed / 1e6;
-        double eta = elapsed * (num_batches - batch - 1) / (batch + 1);
-        
-        int bar_width = 30;
-        int filled = (int)(bar_width * pct / 100.0);
-        printf("\r  [");
-        for (int i = 0; i < bar_width; i++)
-            printf("%s", i < filled ? "\xe2\x96\x88" : "\xe2\x96\x91");
-        printf("] %5.1f%%  %.1f Mph/s", pct, rate);
-        if (eta > 60.0)
-            printf("  ETA %dm%02ds", (int)(eta / 60), (int)eta % 60);
-        else
-            printf("  ETA %ds", (int)eta);
-        fflush(stdout);
+        // Progress update every 5 batches or on last batch
+        if ((batch + 1) % 5 == 0 || batch == num_batches - 1) {
+            auto t_now = std::chrono::high_resolution_clock::now();
+            double elapsed = std::chrono::duration<double>(t_now - t_start).count();
+            double pct = 100.0 * (batch + 1) / num_batches;
+            uint64_t photons_done = (uint64_t)(batch + 1) * photons_per_batch;
+            photons_done = (photons_done > num_photons) ? num_photons : photons_done;
+            double rate = photons_done / elapsed / 1e6;
+            double eta = (batch + 1 > 0) ? elapsed * (num_batches - batch - 1) / (batch + 1) : 0;
+            
+            int bar_width = 30;
+            int filled = (int)(bar_width * pct / 100.0);
+            
+            // Use newline every 5% for visibility with tee
+            printf("\r  [");
+            for (int i = 0; i < bar_width; i++)
+                printf("%s", i < filled ? "#" : "-");
+            printf("] %5.1f%%  %.1f Mph/s", pct, rate);
+            if (eta > 60.0)
+                printf("  ETA %dm%02ds", (int)(eta / 60), (int)eta % 60);
+            else
+                printf("  ETA %ds", (int)eta);
+            fflush(stdout);
+        }
     }
     printf("\nKernel done.\n");
 
