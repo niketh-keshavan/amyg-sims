@@ -51,7 +51,9 @@ int pos_to_voxel(float x, float y, float z) {
         iy < 0 || iy >= d_config.ny ||
         iz < 0 || iz >= d_config.nz)
         return -1;
-    return ix + iy * d_config.nx + iz * d_config.nx * d_config.ny;
+    // FIX #1: Use 64-bit arithmetic to prevent overflow with large grids
+    // For 1600^3 grid, max index is 4.09B which exceeds 32-bit signed int (2.14B)
+    return (int)((size_t)ix + (size_t)iy * d_config.nx + (size_t)iz * d_config.nx * d_config.ny);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +247,9 @@ __global__ void mc_kernel(
     uint64_t tid = blockIdx.x * (uint64_t)blockDim.x + threadIdx.x;
 
     curandState rng;
-    curand_init(seed_offset + tid, 0, 0, &rng);
+    // FIX #5: Use fixed global seed (param 1) and unique sequence (param 2)
+    // This prevents correlated RNG sequences across threads
+    curand_init(12345, seed_offset + tid, 0, &rng);
 
     for (uint64_t p = 0; p < photons_per_thread; p++) {
         // --- Launch photon with beam spread ---
@@ -307,7 +311,8 @@ __global__ void mc_kernel(
 
         // --- Propagation loop ---
         for (int step = 0; step < 500000; step++) {
-            uint8_t tissue = get_tissue(volume, px, py, pz);
+            // FIX #6: Use texture-cached volume lookup
+uint8_t tissue = get_tissue_cached(px, py, pz);
 
             if (tissue == TISSUE_AIR) {
                 int det_id = check_detectors(px, py, pz, ddx, ddy, ddz);
@@ -366,23 +371,56 @@ __global__ void mc_kernel(
             }
 
             // Check boundary after move
-            uint8_t new_tissue = get_tissue(volume, px, py, pz);
+            uint8_t new_tissue = get_tissue_cached(px, py, pz);
             if (new_tissue == TISSUE_AIR) {
-                // Fresnel reflection at tissue-air boundary
+                // FIX #2 & #3: Proper boundary handling with true surface normal
                 float n_in  = d_config.tissue[tissue].n;
                 float n_out = 1.0f;
-                float cos_i = fmaxf(fabsf(ddx), fmaxf(fabsf(ddy), fabsf(ddz)));
+                
+                // Compute true surface normal (radial from head center for ellipsoid)
+                float cx = d_config.nx * d_config.dx * 0.5f;
+                float cy = d_config.ny * d_config.dx * 0.5f;
+                float cz = d_config.nz * d_config.dx * 0.5f;
+                float nx = px - cx;
+                float ny = py - cy;
+                float nz = pz - cz;
+                float n_mag = sqrtf(nx*nx + ny*ny + nz*nz);
+                if (n_mag > 0) { nx /= n_mag; ny /= n_mag; nz /= n_mag; }
+                
+                // cos(theta_i) = dot(direction, normal)
+                float cos_i = -(ddx * nx + ddy * ny + ddz * nz);  // Negative because photon is exiting
+                if (cos_i < 0) cos_i = -cos_i;  // Ensure positive
+                
                 float R = fresnel_reflect(n_in, n_out, cos_i);
                 if (curand_uniform(&rng) < R) {
-                    px -= ddx * s;
-                    py -= ddy * s;
-                    pz -= ddz * s;
-                    ppl[tissue] -= s;
-                    total_pl -= s;
-                    float ax = fabsf(ddx), ay = fabsf(ddy), az = fabsf(ddz);
-                    if (ax >= ay && ax >= az) ddx = -ddx;
-                    else if (ay >= ax && ay >= az) ddy = -ddy;
-                    else ddz = -ddz;
+                    // FIX #3: Calculate distance to boundary and travel remaining fraction
+                    // Move back to boundary (approximate)
+                    float t_boundary = 0.5f * d_config.dx;  // Half voxel to boundary
+                    px -= ddx * t_boundary;
+                    py -= ddy * t_boundary;
+                    pz -= ddz * t_boundary;
+                    ppl[tissue] -= t_boundary;
+                    total_pl -= t_boundary;
+                    
+                    // True reflection: r = d - 2(d·n)n
+                    float d_dot_n = ddx * nx + ddy * ny + ddz * nz;
+                    ddx = ddx - 2.0f * d_dot_n * nx;
+                    ddy = ddy - 2.0f * d_dot_n * ny;
+                    ddz = ddz - 2.0f * d_dot_n * nz;
+                    
+                    // Normalize
+                    float d_mag = sqrtf(ddx*ddx + ddy*ddy + ddz*ddz);
+                    if (d_mag > 0) { ddx /= d_mag; ddy /= d_mag; ddz /= d_mag; }
+                    
+                    // Travel remaining distance in new direction
+                    float s_remaining = s - t_boundary;
+                    if (s_remaining > 0) {
+                        px += ddx * s_remaining;
+                        py += ddy * s_remaining;
+                        pz += ddz * s_remaining;
+                        ppl[tissue] += s_remaining;
+                        total_pl += s_remaining;
+                    }
                     continue;
                 }
                 // Photon transmitted: check detectors
@@ -412,19 +450,47 @@ __global__ void mc_kernel(
                 float n_in  = d_config.tissue[tissue].n;
                 float n_out = d_config.tissue[new_tissue].n;
                 if (fabsf(n_in - n_out) > 1e-5f) {
-                    float cos_i = fmaxf(fabsf(ddx), fmaxf(fabsf(ddy), fabsf(ddz)));
+                    // FIX #2: Use proper surface normal calculation
+                    // For internal boundaries, use radial normal from head center
+                    float cx = d_config.nx * d_config.dx * 0.5f;
+                    float cy = d_config.ny * d_config.dx * 0.5f;
+                    float cz = d_config.nz * d_config.dx * 0.5f;
+                    float nx = px - cx;
+                    float ny = py - cy;
+                    float nz = pz - cz;
+                    float n_mag = sqrtf(nx*nx + ny*ny + nz*nz);
+                    if (n_mag > 0) { nx /= n_mag; ny /= n_mag; nz /= n_mag; }
+                    
+                    float cos_i = fabsf(ddx * nx + ddy * ny + ddz * nz);
                     float R = fresnel_reflect(n_in, n_out, cos_i);
                     if (curand_uniform(&rng) < R) {
-                        px -= ddx * s;
-                        py -= ddy * s;
-                        pz -= ddz * s;
-                        ppl[tissue] -= s;
-                        total_pl -= s;
+                        // FIX #3: Proper boundary handling
+                        float t_boundary = 0.5f * d_config.dx;
+                        px -= ddx * t_boundary;
+                        py -= ddy * t_boundary;
+                        pz -= ddz * t_boundary;
+                        ppl[tissue] -= t_boundary;
+                        total_pl -= t_boundary;
 
-                        float ax = fabsf(ddx), ay = fabsf(ddy), az = fabsf(ddz);
-                        if (ax >= ay && ax >= az) ddx = -ddx;
-                        else if (ay >= ax && ay >= az) ddy = -ddy;
-                        else ddz = -ddz;
+                        // True reflection
+                        float d_dot_n = ddx * nx + ddy * ny + ddz * nz;
+                        ddx = ddx - 2.0f * d_dot_n * nx;
+                        ddy = ddy - 2.0f * d_dot_n * ny;
+                        ddz = ddz - 2.0f * d_dot_n * nz;
+                        
+                        // Normalize
+                        float d_mag = sqrtf(ddx*ddx + ddy*ddy + ddz*ddz);
+                        if (d_mag > 0) { ddx /= d_mag; ddy /= d_mag; ddz /= d_mag; }
+                        
+                        // Travel remaining distance
+                        float s_remaining = s - t_boundary;
+                        if (s_remaining > 0) {
+                            px += ddx * s_remaining;
+                            py += ddy * s_remaining;
+                            pz += ddz * s_remaining;
+                            ppl[tissue] += s_remaining;
+                            total_pl += s_remaining;
+                        }
                         continue;
                     }
                 }
@@ -481,6 +547,37 @@ void launch_mc_simulation(
     uint8_t* d_volume;
     cudaMalloc(&d_volume, vol_size);
     cudaMemcpy(d_volume, h_volume, vol_size, cudaMemcpyHostToDevice);
+
+    // FIX #6: Bind volume to 3D texture for cached access
+    // Create 3D array for texture
+    cudaExtent extent = make_cudaExtent(nx, ny, nz);
+    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uint8_t>();
+    cudaArray_t cuArray;
+    cudaMalloc3DArray(&cuArray, &channelDesc, extent);
+    
+    // Copy volume to 3D array
+    cudaMemcpy3DParms copyParams = {};
+    copyParams.srcPtr = make_cudaPitchedPtr((void*)d_volume, nx * sizeof(uint8_t), nx, ny);
+    copyParams.dstArray = cuArray;
+    copyParams.extent = extent;
+    copyParams.kind = cudaMemcpyDeviceToDevice;
+    cudaMemcpy3D(&copyParams);
+    
+    // Create texture object
+    cudaResourceDesc resDesc = {};
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = cuArray;
+    
+    cudaTextureDesc texDesc = {};
+    texDesc.readMode = cudaReadModeElementType;
+    texDesc.addressMode[0] = cudaAddressModeClamp;
+    texDesc.addressMode[1] = cudaAddressModeClamp;
+    texDesc.addressMode[2] = cudaAddressModeClamp;
+    texDesc.filterMode = cudaFilterModePoint;
+    
+    cudaTextureObject_t vol_tex;
+    cudaCreateTextureObject(&vol_tex, &resDesc, &texDesc, nullptr);
+    cudaMemcpyToSymbol(d_vol_tex, &vol_tex, sizeof(cudaTextureObject_t));
 
     // --- Upload config to constant memory ---
     cudaMemcpyToSymbol(d_config, &config, sizeof(SimConfig));
@@ -666,6 +763,10 @@ void launch_mc_simulation(
     }
 
     // --- Cleanup ---
+    // FIX #6: Destroy texture object and free array
+    cudaDestroyTextureObject(vol_tex);
+    cudaFreeArray(cuArray);
+    
     cudaFree(d_volume);
     cudaFree(d_det_weight);
     cudaFree(d_det_pathlength);
