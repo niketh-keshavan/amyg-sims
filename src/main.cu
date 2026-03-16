@@ -217,20 +217,26 @@ int main(int argc, char** argv) {
     // --- Allocate fluence volume on GPU ---
     size_t vol_size = (size_t)hm.nx * hm.ny * hm.nz;
     size_t fluence_bytes = vol_size * sizeof(float);
+    size_t volume_bytes = vol_size * sizeof(uint8_t);
+    size_t total_gpu_bytes = fluence_bytes + volume_bytes;
     
     printf("Memory requirements:\n");
-    printf("  Volume: %zu voxels (%.1f MB)\n", vol_size, vol_size / (1024.0*1024.0));
+    printf("  Volume: %zu voxels (%.1f MB)\n", vol_size, volume_bytes / (1024.0*1024.0));
     printf("  Fluence: %.1f MB\n", fluence_bytes / (1024.0*1024.0));
+    printf("  Total required: %.1f MB\n", total_gpu_bytes / (1024.0*1024.0));
     
     size_t free_mem, total_mem;
     cudaMemGetInfo(&free_mem, &total_mem);
     printf("  GPU memory: %.1f MB free / %.1f MB total\n", 
            free_mem / (1024.0*1024.0), total_mem / (1024.0*1024.0));
     
-    if (fluence_bytes > free_mem * 0.8) {
-        fprintf(stderr, "ERROR: Not enough GPU memory for fluence volume\n");
-        fprintf(stderr, "  Required: %.1f MB, Available: %.1f MB\n",
-                fluence_bytes / (1024.0*1024.0), free_mem / (1024.0*1024.0));
+    // FIX #4: Include both fluence AND volume in VRAM check
+    if (total_gpu_bytes > free_mem * 0.8) {
+        fprintf(stderr, "ERROR: Not enough GPU memory\n");
+        fprintf(stderr, "  Required: %.1f MB (fluence + volume)\n",
+                total_gpu_bytes / (1024.0*1024.0));
+        fprintf(stderr, "  Available: %.1f MB (80%% of free)\n",
+                free_mem * 0.8 / (1024.0*1024.0));
         fprintf(stderr, "  Consider reducing grid size or using a GPU with more memory\n");
         return 1;
     }
