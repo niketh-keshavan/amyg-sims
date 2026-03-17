@@ -870,6 +870,14 @@ def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0,
         print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
         save_checkpoint(checkpoint_dir, step, (nodes, elems, tissue_labels))
 
+    # Transform nodes from voxel index space to MNI mm space
+    nodes_hom = np.hstack([nodes, np.ones((len(nodes), 1))])
+    nodes = (affine @ nodes_hom.T).T[:, :3]
+    print(f"  Nodes transformed to MNI space: "
+          f"x=[{nodes[:,0].min():.1f}, {nodes[:,0].max():.1f}]  "
+          f"y=[{nodes[:,1].min():.1f}, {nodes[:,1].max():.1f}]  "
+          f"z=[{nodes[:,2].min():.1f}, {nodes[:,2].max():.1f}]")
+
     # Step 5: Amygdala labeling
     step = "step5_amygdala"
     if resume:
