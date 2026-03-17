@@ -1,6 +1,5 @@
 #include "types.cuh"
 #include "optical_properties.cuh"
-#include "detector.cuh"
 #include "mmc_mesh.cuh"
 #include "mmc_kernel.cuh"
 #include <cstdio>
