@@ -316,17 +316,20 @@ def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
             "  https://github.com/NeuroJSON/pyiso2mesh")
     
     print(f"Meshing with brain2mesh (max_vol={max_vol:.1f} mm³)...")
+    print("  Steps: surface extraction → cleaning → volumetric meshing")
     t0 = time.time()
     
     # Stack segmentations: brain2mesh expects outer-to-inner order
     # Based on docs: 0-Scalp, 1-Skull, 2-CSF, 3-GM, 4-WM
-    seg = np.stack([
-        seg_dict['scalp'].astype(np.float64),
-        seg_dict['skull'].astype(np.float64), 
-        seg_dict['csf'].astype(np.float64),
-        seg_dict['gm'].astype(np.float64),
-        seg_dict['wm'].astype(np.float64)
-    ], axis=-1)  # Shape: (nx, ny, nz, 5)
+    with tqdm(total=1, desc="  Stacking 5 tissue volumes", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+        seg = np.stack([
+            seg_dict['scalp'].astype(np.float64),
+            seg_dict['skull'].astype(np.float64), 
+            seg_dict['csf'].astype(np.float64),
+            seg_dict['gm'].astype(np.float64),
+            seg_dict['wm'].astype(np.float64)
+        ], axis=-1)  # Shape: (nx, ny, nz, 5)
+        pbar.update(1)
     
     cfg = {
         'maxvol': max_vol,
@@ -335,8 +338,13 @@ def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
         'ratio': 1.5,       # Quality ratio
     }
     
-    # Call brain2mesh
+    # Call brain2mesh (this is the slow step - can take 10-30 min)
+    # No progress callback available, so we just wait
+    print("  ⚠️  brain2mesh running (this may take 10-30 minutes)...")
+    print("  Progress info will appear below from CGAL/TetGen tools:")
+    print("-"*50)
     mesh = iso2mesh.brain2mesh(seg, **cfg)
+    print("-"*50)
     
     nodes = np.asarray(mesh['node'], dtype=np.float64)
     elems = np.asarray(mesh['elem'], dtype=np.int64)
@@ -608,7 +616,7 @@ def save_mmcmesh(path, nodes_mm, elems, tissue_labels, neighbors):
 # Full pipeline
 # ---------------------------------------------------------------------------
 
-def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
+def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0):
     t_total = time.time()
 
     print("="*60)
@@ -617,34 +625,48 @@ def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
 
     # 1. Load atlas
     print("\n[1/7] Loading atlas...")
-    t1, gm, wm, csf, brain_mask, affine = load_mni152_atlas()
+    with tqdm(total=1, desc="  Downloading/loading MNI152 atlas", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+        t1, gm, wm, csf, brain_mask, affine = load_mni152_atlas()
+        pbar.update(1)
 
     # 2. Build tissue label volume
     print("\n[2/7] Building tissue label volume...")
-    labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
+    with tqdm(total=1, desc="  Segmenting tissues", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+        labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
+        pbar.update(1)
 
     # 3. Prepare segmentation volumes for brain2mesh
     print("\n[3/7] Preparing segmentation volumes...")
-    # Create binary masks for each tissue (convert from label volume)
-    seg_dict = {
-        'scalp': (labels == TISSUE_SCALP).astype(np.float64),
-        'skull': (labels == TISSUE_SKULL).astype(np.float64),
-        'csf':   ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64),  # Amygdala treated as CSF/GM for now
-        'gm':    (labels == TISSUE_GRAY).astype(np.float64),
-        'wm':    (labels == TISSUE_WHITE).astype(np.float64)
-    }
+    seg_dict = {}
+    tissue_names = ['scalp', 'skull', 'csf', 'gm', 'wm']
+    for name in tqdm(tissue_names, desc="  Creating tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+        if name == 'scalp':
+            seg_dict[name] = (labels == TISSUE_SCALP).astype(np.float64)
+        elif name == 'skull':
+            seg_dict[name] = (labels == TISSUE_SKULL).astype(np.float64)
+        elif name == 'csf':
+            seg_dict[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
+        elif name == 'gm':
+            seg_dict[name] = (labels == TISSUE_GRAY).astype(np.float64)
+        elif name == 'wm':
+            seg_dict[name] = (labels == TISSUE_WHITE).astype(np.float64)
+    
     print(f"  Segmentation volumes: {labels.shape}")
     for name, vol in seg_dict.items():
         print(f"    {name}: {int(vol.sum()):,} voxels")
 
     # 4. Tetrahedral mesh with brain2mesh
     print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
-    mesh_max_vol = 50.0  # Reasonable default for brain2mesh
-    nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=mesh_max_vol)
+    print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
+    t_mesh = time.time()
+    nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
+    print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
     
-    # 5. Add amygdala labeling post-mesh (brain2mesh doesn't know amygdala)
+    # 5. Add amygdala labeling post-mesh
     print("\n[5/7] Adding amygdala tissue labels...")
-    tissue_labels = add_amygdala_to_mesh(nodes, elems, tissue_labels, affine)
+    with tqdm(total=1, desc="  Labeling amygdala regions", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+        tissue_labels = add_amygdala_to_mesh(nodes, elems, tissue_labels, affine)
+        pbar.update(1)
 
     # 6. Neighbor connectivity
     print("\n[6/7] Building neighbor connectivity...")
@@ -652,10 +674,14 @@ def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
 
     # 7. Save
     print("\n[7/7] Saving binary mesh...")
-    save_mmcmesh(output_path, nodes, elems, tissue_labels, neighbors)
+    with tqdm(total=1, desc="  Writing .mmcmesh file", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+        save_mmcmesh(output_path, nodes, elems, tissue_labels, neighbors)
+        pbar.update(1)
 
-    print(f"\nTotal time: {time.time()-t_total:.1f}s")
-    print(f"Output: {output_path}")
+    print(f"\n{'='*60}")
+    print(f"  Total time: {time.time()-t_total:.1f}s")
+    print(f"  Output: {output_path}")
+    print(f"{'='*60}")
 
     # Print mesh stats
     print("\nMesh statistics:")
@@ -669,7 +695,9 @@ def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
     print(f"  Mean tet volume: {vol.mean():.2f} mm³  (max: {vol.max():.1f})")
     amyg_vols = vol[tissue_labels == TISSUE_AMYGDALA]
     if len(amyg_vols) > 0:
-        print(f"  Amygdala tets: {len(amyg_vols):,}  (total vol: {amyg_vols.sum():.0f} mm³)")
+        print(f"  ✅ Amygdala tets: {len(amyg_vols):,}  (total vol: {amyg_vols.sum():.0f} mm³)")
+    else:
+        print(f"  ⚠️  WARNING: No amygdala tets found!")
 
 
 # ---------------------------------------------------------------------------
