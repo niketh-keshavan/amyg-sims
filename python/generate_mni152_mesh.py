@@ -375,9 +375,9 @@ def assign_tissue_labels(nodes_mm, elems, labels_vol, affine):
     for ac in amyg_centers:
         dist2 = np.sum((centroids - ac)**2, axis=1)
         in_sphere = dist2 <= amyg_radius**2
-        # Only override brain tissue (gray/white), not scalp/skull/csf
-        brain_mask = (tissue_labels == TISSUE_GRAY) | (tissue_labels == TISSUE_WHITE)
-        override = in_sphere & brain_mask
+        # Override any non-air tissue within sphere (deep brain, so no scalp/skull expected)
+        non_air = tissue_labels != 0
+        override = in_sphere & non_air
         tissue_labels[override] = TISSUE_AMYGDALA
         n_override = np.sum(override)
         if n_override > 0:
