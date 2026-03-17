@@ -291,17 +291,15 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
 # Step 4: Tetrahedral meshing with TetGen
 # ---------------------------------------------------------------------------
 
-def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
+def mesh_with_brain2mesh(labels_vol, max_vol=20.0):
     """
-    Generate multi-tissue brain mesh using iso2mesh.brain2mesh.
+    Generate multi-tissue brain mesh using cgalv2m from iso2mesh.
 
-    brain2mesh creates conforming tetrahedral meshes with proper tissue
-    boundaries, giving adequate resolution at all tissue interfaces including
-    deep brain structures.
+    Uses CGAL volume meshing on a binary mask, then assigns tissue labels
+    (including amygdala) by sampling the full label volume at tet centroids.
 
     Args:
-        seg_dict: dict with keys 'scalp', 'skull', 'csf', 'gm', 'wm'
-                  Each is a 3D binary/probability numpy array
+        labels_vol: 3D label volume with all tissue types (0-6 including amygdala)
         max_vol: maximum tet volume in mm³
 
     Returns:
@@ -316,58 +314,50 @@ def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
             "Install iso2mesh: pip install iso2mesh or from GitHub\n"
             "  https://github.com/NeuroJSON/pyiso2mesh")
 
-    print(f"Meshing with brain2mesh (max_vol={max_vol:.1f} mm³)...")
+    print(f"Meshing with cgalv2m (max_vol={max_vol:.1f} mm³)...")
     t0 = time.time()
 
-    # brain2mesh expects a dict with tissue probability maps
-    # Keys: 'wm', 'gm', 'csf', 'skull', 'scalp'
-    seg_input = {
-        'scalp': seg_dict['scalp'].astype(np.float64),
-        'skull': seg_dict['skull'].astype(np.float64),
-        'csf': seg_dict['csf'].astype(np.float64),
-        'gm': seg_dict['gm'].astype(np.float64),
-        'wm': seg_dict['wm'].astype(np.float64),
-    }
+    # Create binary mask of all tissues for cgalv2m
+    brain_mask = (labels_vol > 0).astype(np.uint8)
 
-    print(f"  Input volume shape: {seg_input['scalp'].shape}")
-    for name, vol in seg_input.items():
-        print(f"    {name}: {int((vol > 0.5).sum()):,} voxels")
+    print(f"  Label volume shape: {labels_vol.shape}")
+    print(f"  Tissue voxel counts:")
+    names = ['bg', 'scalp', 'skull', 'csf', 'gm', 'wm', 'amygdala']
+    for i, name in enumerate(names):
+        count = np.sum(labels_vol == i)
+        if count > 0:
+            print(f"    {name}: {count:,}")
 
-    cfg = {
-        'maxvol': max_vol,
-        'radbound': {'scalp': 3.0, 'skull': 3.0, 'csf': 3.0, 'gm': 3.0, 'wm': 3.0},
-        'ratio': 1.414,
-    }
+    opt = {'maxvol': max_vol, 'radbound': 3.0}
+    print(f"  Running cgalv2m...")
+    mesh = iso2mesh.cgalv2m(brain_mask, opt, max_vol)
 
-    print(f"  Running brain2mesh (this may take several minutes)...")
-    brain_n, brain_el, brain_f = iso2mesh.brain2mesh(seg_input, **cfg)
+    if isinstance(mesh, tuple):
+        nodes = np.asarray(mesh[0], dtype=np.float64)
+        elems = np.asarray(mesh[1], dtype=np.int64)
+    else:
+        nodes = np.asarray(mesh['node'], dtype=np.float64)
+        elems = np.asarray(mesh['elem'], dtype=np.int64)
 
-    nodes = np.asarray(brain_n, dtype=np.float64)
-    elems_raw = np.asarray(brain_el, dtype=np.int64)
-
-    # Ensure nodes is (N, 3)
     if nodes.ndim == 2 and nodes.shape[1] == 4:
         nodes = nodes[:, :3]
 
-    print(f"  Raw mesh: {len(nodes)} nodes, elems shape {elems_raw.shape}")
+    print(f"  Raw mesh: {len(nodes)} nodes, elems shape {elems.shape}")
 
-    # brain2mesh returns elements as [n1, n2, n3, n4, tissue_id] (1-indexed)
-    # Extract tissue labels from last column, then node indices
-    if elems_raw.shape[1] >= 5:
-        tissue_labels = elems_raw[:, 4].astype(np.int32)
-        elems = elems_raw[:, :4]
-    else:
-        tissue_labels = np.zeros(len(elems_raw), dtype=np.int32)
-        elems = elems_raw[:, :4]
+    if elems.shape[1] >= 5:
+        elems = elems[:, :4]
+    elems = elems - 1  # 0-indexed
 
-    # Convert from 1-indexed to 0-indexed
-    elems = elems - 1
+    # Assign tissue labels by sampling the FULL label volume (includes amygdala=6)
+    print("  Assigning tissue labels from full label volume...")
+    identity_aff = np.eye(4)
+    tissue_labels = assign_tissue_labels_to_mesh(nodes, elems, labels_vol, identity_aff)
 
     elapsed = time.time() - t0
-    print(f"  brain2mesh done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
+    print(f"  cgalv2m done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
 
     # Print tissue distribution
-    tissue_names = ['air', 'scalp', 'skull', 'csf', 'gray', 'white']
+    tissue_names = ['air', 'scalp', 'skull', 'csf', 'gray', 'white', 'amygdala']
     print("  Tissue distribution:")
     for i, name in enumerate(tissue_names):
         count = np.sum(tissue_labels == i)
@@ -722,7 +712,7 @@ def load_checkpoint(checkpoint_dir, step_name):
         return data
     return None
 
-def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0, 
+def generate_mni152_mesh(output_path, max_vol=20.0, min_dihedral=15.0, 
                          checkpoint_dir=None, resume=True):
     """
     Generate MNI152 head mesh with checkpoint/resume support.
@@ -863,14 +853,14 @@ def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0,
             print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
             print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
             t_mesh = time.time()
-            nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
+            nodes, elems, tissue_labels = mesh_with_brain2mesh(labels, max_vol=max_vol)
             print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
             save_checkpoint(checkpoint_dir, step, (nodes, elems, tissue_labels))
     else:
         print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
         print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
         t_mesh = time.time()
-        nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
+        nodes, elems, tissue_labels = mesh_with_brain2mesh(labels, max_vol=max_vol)
         print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
         save_checkpoint(checkpoint_dir, step, (nodes, elems, tissue_labels))
 
@@ -964,7 +954,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--output',   default='mni152_head.mmcmesh',
                    help='Output .mmcmesh file path (default: mni152_head.mmcmesh)')
-    p.add_argument('--max-vol',  type=float, default=50.0,
+    p.add_argument('--max-vol',  type=float, default=20.0,
                    help='Max tet volume mm³ — smaller = denser mesh (default: 50)')
     p.add_argument('--min-dihedral', type=float, default=15.0,
                    help='Min dihedral angle in degrees (default: 15)')
