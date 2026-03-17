@@ -408,13 +408,16 @@ def assign_tissue_labels_to_mesh(nodes_mm, elems, labels_vol, affine):
         tissue_labels: (M,) int32 tissue type per element
     """
     print("    Computing centroids and sampling labels...")
+    print(f"    nodes_mm shape: {nodes_mm.shape}, elems shape: {elems.shape}")
     inv_aff = np.linalg.inv(affine)
     
     # Compute centroids
     centroids = nodes_mm[elems[:, :4]].mean(axis=1)
+    print(f"    centroids shape: {centroids.shape}")
     
     # Transform to voxel space
     cents_hom = np.hstack([centroids, np.ones((len(centroids), 1))])
+    print(f"    cents_hom shape: {cents_hom.shape}, inv_aff shape: {inv_aff.shape}")
     vox_coords = (inv_aff @ cents_hom.T).T[:, :3]
     
     # Round to nearest voxel
