@@ -367,8 +367,24 @@ def assign_tissue_labels(nodes_mm, elems, labels_vol, affine):
 
     tissue_labels = labels_vol[vi, vj, vk].astype(np.int32)
 
+    # Post-process: override amygdala labels using direct MNI sphere check.
+    # The centroid voxel lookup misses small ROIs (6.5mm radius) due to
+    # coarse tet resolution. Directly check centroid-to-sphere distance.
+    amyg_centers = np.array([[24., -2., -20.], [-24., -2., -20.]])
+    amyg_radius = 6.5
+    for ac in amyg_centers:
+        dist2 = np.sum((centroids - ac)**2, axis=1)
+        in_sphere = dist2 <= amyg_radius**2
+        # Only override brain tissue (gray/white), not scalp/skull/csf
+        brain_mask = (tissue_labels == TISSUE_GRAY) | (tissue_labels == TISSUE_WHITE)
+        override = in_sphere & brain_mask
+        tissue_labels[override] = TISSUE_AMYGDALA
+        n_override = np.sum(override)
+        if n_override > 0:
+            print(f"    Amygdala override: {n_override} tets near ({ac[0]:.0f},{ac[1]:.0f},{ac[2]:.0f})")
+
     print("  Counting tissue types...")
-    for t, name in enumerate(tqdm(['air','scalp','skull','csf','gray','white','amygdala'], 
+    for t, name in enumerate(tqdm(['air','scalp','skull','csf','gray','white','amygdala'],
                                    desc="  Tissue counts", leave=False)):
         n = np.sum(tissue_labels == t)
         if n > 0:

@@ -159,10 +159,10 @@ static void find_source_on_scalp(const HostMesh& mesh,
     }
 
     if (amyg_count == 0) {
-        fprintf(stderr, "WARNING: no right amygdala elements found, using mesh center\n");
-        amyg_cx = (mesh.bbox_min[0] + mesh.bbox_max[0]) * 0.5f;
-        amyg_cy = (mesh.bbox_min[1] + mesh.bbox_max[1]) * 0.5f;
-        amyg_cz = (mesh.bbox_min[2] + mesh.bbox_max[2]) * 0.5f;
+        fprintf(stderr, "WARNING: no amygdala elements in mesh, using MNI atlas coordinates\n");
+        amyg_cx = 24.0f;
+        amyg_cy = -2.0f;
+        amyg_cz = -20.0f;
     } else {
         amyg_cx /= amyg_count;
         amyg_cy /= amyg_count;
