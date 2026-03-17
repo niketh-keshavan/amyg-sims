@@ -345,36 +345,16 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     # Create a binary mask of all brain tissues
     brain_mask = (labels_3d > 0).astype(np.uint8)
     
-    # Create simple seed points on the surface
-    # Find surface voxels (brain voxels adjacent to background)
-    from scipy import ndimage
-    eroded = ndimage.binary_erosion(brain_mask)
-    surface = brain_mask & ~eroded
-    x_idx, y_idx, z_idx = np.where(surface)
-    
-    # Limit seed points
-    n_seeds = min(len(x_idx), 5000)
-    if len(x_idx) > n_seeds:
-        step = len(x_idx) // n_seeds
-        indices = np.arange(0, len(x_idx), step)[:n_seeds]
-        x_idx, y_idx, z_idx = x_idx[indices], y_idx[indices], z_idx[indices]
-    
-    print(f"    Using {len(x_idx)} surface seed points")
-    
-    # Create options as a simple dictionary
+    # Create options dictionary
     opt = {
         'maxvol': max_vol,
         'radbound': 3.0,
     }
     
-    # Mesh the brain volume
-    mesh = iso2mesh.cgalv2m(
-        brain_mask,
-        x_idx.astype(np.float64), 
-        y_idx.astype(np.float64),
-        z_idx.astype(np.float64),
-        opt
-    )
+    print(f"    Meshing with maxvol={max_vol}...")
+    
+    # Mesh the brain volume - cgalv2m(vol, opt, maxvol)
+    mesh = iso2mesh.cgalv2m(brain_mask, opt, max_vol)
     
     nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
     elems = np.asarray(mesh['elem'], dtype=np.int64)
