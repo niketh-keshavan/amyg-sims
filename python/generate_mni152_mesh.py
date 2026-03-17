@@ -291,17 +291,18 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
 # Step 4: Tetrahedral meshing with TetGen
 # ---------------------------------------------------------------------------
 
-def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
+def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     """
-    Generate multi-tissue brain mesh using brain2mesh from iso2mesh.
+    Generate multi-tissue brain mesh using cgalmesh from iso2mesh.
     
-    This creates properly labeled tetrahedra throughout the brain volume,
-    unlike surface-only meshing which creates sparse interior tets.
+    This uses CGAL's 3D mesh generation from labeled volumes, which is more
+    robust than brain2mesh's surface boolean approach for complex geometries.
     
     Args:
         seg_dict: dict with keys 'scalp', 'skull', 'csf', 'gm', 'wm'
                   Each is a 3D binary numpy array
-        max_vol: maximum tet volume (default 100 for reasonable density)
+        max_vol: maximum tet volume
+        voxel_size: voxel size in mm (default 1.0)
     
     Returns:
         nodes: (N,3) float64 node positions in mm
@@ -315,47 +316,54 @@ def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
             "Install iso2mesh: pip install iso2mesh or from GitHub\n"
             "  https://github.com/NeuroJSON/pyiso2mesh")
     
-    print(f"Meshing with brain2mesh (max_vol={max_vol:.1f} mm³)...")
-    print("  Steps: surface extraction → cleaning → volumetric meshing")
+    print(f"Meshing with cgalmesh (max_vol={max_vol:.1f} mm³)...")
+    print("  Using CGAL 3D mesh generation from labeled volume...")
     t0 = time.time()
     
-    # Stack segmentations: brain2mesh expects outer-to-inner order
-    # Based on docs: 0-Scalp, 1-Skull, 2-CSF, 3-GM, 4-WM
-    with tqdm(total=1, desc="  Stacking 5 tissue volumes", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
-        seg = np.stack([
-            seg_dict['scalp'].astype(np.float64),
-            seg_dict['skull'].astype(np.float64), 
-            seg_dict['csf'].astype(np.float64),
-            seg_dict['gm'].astype(np.float64),
-            seg_dict['wm'].astype(np.float64)
-        ], axis=-1)  # Shape: (nx, ny, nz, 5)
-        pbar.update(1)
+    # Create a labeled volume where each voxel has a tissue label
+    # Priority: inner tissues overwrite outer ones
+    shape = seg_dict['scalp'].shape
+    labels_3d = np.zeros(shape, dtype=np.uint8)
     
-    cfg = {
-        'maxvol': max_vol,
-        'maxnode': 50000,   # Further reduced for robustness
-        'smooth': 5,        # Aggressive smoothing to fix self-intersections
-        'ratio': 3.0,       # Very relaxed quality ratio
-    }
+    # Assign labels: 1=scalp, 2=skull, 3=csf, 4=gm, 5=wm
+    # Use priority: inner tissues overwrite outer
+    labels_3d[seg_dict['scalp'] > 0.5] = 1
+    labels_3d[seg_dict['skull'] > 0.5] = 2
+    labels_3d[seg_dict['csf'] > 0.5] = 3
+    labels_3d[seg_dict['gm'] > 0.5] = 4
+    labels_3d[seg_dict['wm'] > 0.5] = 5
     
-    # Call brain2mesh (this is the slow step - can take 10-30 min)
-    # No progress callback available, so we just wait
-    print("  ⚠️  brain2mesh running (this may take 10-30 minutes)...")
-    print("  Progress info will appear below from CGAL/TetGen tools:")
-    print("-"*50)
-    mesh = iso2mesh.brain2mesh(seg, **cfg)
-    print("-"*50)
+    print(f"  Label volume shape: {labels_3d.shape}")
+    print(f"  Tissue voxel counts:")
+    for i, name in enumerate(['bg', 'scalp', 'skull', 'csf', 'gm', 'wm']):
+        print(f"    {name}: {np.sum(labels_3d == i):,}")
     
-    nodes = np.asarray(mesh['node'], dtype=np.float64)
+    # Use vol2mesh to create mesh from labeled volume
+    # This uses CGAL's mesh generation directly
+    print("  Running vol2mesh (CGAL mesh generation)...")
+    mesh = iso2mesh.vol2mesh(
+        labels_3d,
+        iso2mesh.vol2surf(labels_3d, labels_3d > 0),  # Simple surface extraction
+        maxvol=max_vol,
+        keepratio=0.1,
+        verbose=True
+    )
+    
+    nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
     elems = np.asarray(mesh['elem'], dtype=np.int64)
-    # tissue labels from brain2mesh: 0=Scalp, 1=Skull, 2=CSF, 3=GM, 4=WM
-    tissue_labels = np.asarray(mesh['tissue'], dtype=np.int32).flatten()
+    # vol2mesh labels: need to map back
+    tissue_labels = np.asarray(mesh['elemprop'], dtype=np.int32).flatten()
     
     elapsed = time.time() - t0
-    print(f"  brain2mesh done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
+    print(f"  cgalmesh done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
+    
+    # Map labels: vol2mesh output -> our labels (0=air, 1=scalp, 2=skull, 3=csf, 4=gm, 5=wm)
+    # Convert to 0-based: subtract 1
+    tissue_labels = tissue_labels - 1
+    tissue_labels = np.clip(tissue_labels, 0, 5)
     
     # Print tissue distribution
-    tissue_names = ['scalp', 'skull', 'csf', 'gray', 'white']
+    tissue_names = ['air', 'scalp', 'skull', 'csf', 'gray', 'white']
     print("  Tissue distribution:")
     for i, name in enumerate(tissue_names):
         count = np.sum(tissue_labels == i)
@@ -778,7 +786,7 @@ def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0,
             print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
             print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
             t_mesh = time.time()
-            nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
+            nodes, elems, tissue_labels = mesh_with_cgalmesh(seg_dict, max_vol=max_vol)
             print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
             save_checkpoint(checkpoint_dir, step, (nodes, elems, tissue_labels))
     else:
