@@ -291,50 +291,116 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
 # Step 4: Tetrahedral meshing with TetGen
 # ---------------------------------------------------------------------------
 
-def mesh_with_tetgen(surf_verts, surf_faces, max_vol=15.0, min_dihedral=15.0):
+def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
     """
-    Generate a conforming tetrahedral mesh from the scalp surface using TetGen.
-
+    Generate multi-tissue brain mesh using brain2mesh from iso2mesh.
+    
+    This creates properly labeled tetrahedra throughout the brain volume,
+    unlike surface-only meshing which creates sparse interior tets.
+    
     Args:
-        surf_verts: (Nv,3) float64 vertices in mm
-        surf_faces: (Nf,3) int32 triangle indices
-        max_vol: maximum tet volume in mm³ (controls mesh density)
-        min_dihedral: minimum dihedral angle in degrees
-
+        seg_dict: dict with keys 'scalp', 'skull', 'csf', 'gm', 'wm'
+                  Each is a 3D binary numpy array
+        max_vol: maximum tet volume (default 100 for reasonable density)
+    
     Returns:
         nodes: (N,3) float64 node positions in mm
         elems: (M,4) int64 tetrahedra (node indices)
+        tissue_labels: (M,) int32 tissue type per element
     """
     try:
-        import tetgen
+        import iso2mesh
     except ImportError:
         raise ImportError(
-            "Install tetgen Python package: pip install tetgen\n"
-            "  (wraps TetGen by Hang Si, 2002-2018)")
-
-    print(f"Meshing with TetGen (max_vol={max_vol:.1f} mm³, min_dihedral={min_dihedral:.0f}°)...")
+            "Install iso2mesh: pip install iso2mesh or from GitHub\n"
+            "  https://github.com/NeuroJSON/pyiso2mesh")
+    
+    print(f"Meshing with brain2mesh (max_vol={max_vol:.1f} mm³)...")
     t0 = time.time()
-
-    tet = tetgen.TetGen(surf_verts, surf_faces)
-    tet.tetrahedralize(
-        order=1,
-        quality=True,
-        mindihedral=min_dihedral,
-        minratio=1.5,
-        maxvolume=max_vol,
-        verbose=0,
-    )
-
-    nodes = np.asarray(tet.node, dtype=np.float64)
-    elems = np.asarray(tet.elem, dtype=np.int64)
-
+    
+    # Stack segmentations: brain2mesh expects outer-to-inner order
+    # Based on docs: 0-Scalp, 1-Skull, 2-CSF, 3-GM, 4-WM
+    seg = np.stack([
+        seg_dict['scalp'].astype(np.float64),
+        seg_dict['skull'].astype(np.float64), 
+        seg_dict['csf'].astype(np.float64),
+        seg_dict['gm'].astype(np.float64),
+        seg_dict['wm'].astype(np.float64)
+    ], axis=-1)  # Shape: (nx, ny, nz, 5)
+    
+    cfg = {
+        'maxvol': max_vol,
+        'maxnode': 200000,  # Allow more nodes for better resolution
+        'smooth': 2,        # Some smoothing for quality
+        'ratio': 1.5,       # Quality ratio
+    }
+    
+    # Call brain2mesh
+    mesh = iso2mesh.brain2mesh(seg, **cfg)
+    
+    nodes = np.asarray(mesh['node'], dtype=np.float64)
+    elems = np.asarray(mesh['elem'], dtype=np.int64)
+    # tissue labels from brain2mesh: 0=Scalp, 1=Skull, 2=CSF, 3=GM, 4=WM
+    tissue_labels = np.asarray(mesh['tissue'], dtype=np.int32).flatten()
+    
     elapsed = time.time() - t0
-    print(f"  TetGen done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
-    return nodes, elems
+    print(f"  brain2mesh done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
+    
+    # Print tissue distribution
+    tissue_names = ['scalp', 'skull', 'csf', 'gray', 'white']
+    print("  Tissue distribution:")
+    for i, name in enumerate(tissue_names):
+        count = np.sum(tissue_labels == i)
+        if count > 0:
+            print(f"    {name}: {count:,} tets ({100.0*count/len(tissue_labels):.1f}%)")
+    
+    return nodes, elems, tissue_labels
+
+
+def add_amygdala_to_mesh(nodes_mm, elems, tissue_labels, affine, amyg_radius=6.5):
+    """
+    Post-process: re-label tets within amygdala spheres as TISSUE_AMYGDALA.
+    
+    brain2mesh only handles 5 tissue types. We add amygdala (type 6) by
+    checking which tets fall within the amygdala regions.
+    
+    Args:
+        nodes_mm: (N,3) node positions in MNI mm
+        elems: (M,4) tetrahedra node indices  
+        tissue_labels: (M,) current tissue labels (0-4 from brain2mesh)
+        affine: 4x4 voxel-to-mm transformation
+        amyg_radius: radius in mm for amygdala region (default 6.5mm)
+    
+    Returns:
+        tissue_labels: updated with TISSUE_AMYGDALA (6) for tets in spheres
+    """
+    print("  Adding amygdala labels post-brain2mesh...")
+    
+    # Compute centroids
+    centroids = nodes_mm[elems[:, :4]].mean(axis=1)
+    
+    # Amygdala centers in MNI space
+    amyg_centers = np.array([[24., -2., -20.], [-24., -2., -20.]])
+    
+    n_total = 0
+    for ac in amyg_centers:
+        dist2 = np.sum((centroids - ac)**2, axis=1)
+        in_sphere = dist2 <= amyg_radius**2
+        
+        # Override any tissue within sphere (should be GM/WM/CSF)
+        tissue_labels[in_sphere] = TISSUE_AMYGDALA
+        n = int(np.sum(in_sphere))
+        n_total += n
+        min_dist = float(np.sqrt(dist2.min()))
+        print(f"    Amygdala sphere ({ac[0]:+.0f},{ac[1]:+.0f},{ac[2]:+.0f}): "
+              f"{n} tets relabeled, closest centroid {min_dist:.1f}mm")
+    
+    print(f"  Total amygdala tets: {n_total}")
+    return tissue_labels
 
 
 # ---------------------------------------------------------------------------
-# Step 5: Assign tissue labels to tetrahedra
+# Step 5: Assign tissue labels to tetrahedra (legacy, kept for reference)
 # ---------------------------------------------------------------------------
 
 def assign_tissue_labels(nodes_mm, elems, labels_vol, affine):
@@ -557,21 +623,28 @@ def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
     print("\n[2/7] Building tissue label volume...")
     labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
 
-    # 3. Extract scalp surface
-    print("\n[3/7] Extracting scalp surface...")
-    surf_verts, surf_faces = extract_scalp_surface(labels, affine, smooth_sigma=2.5)
+    # 3. Prepare segmentation volumes for brain2mesh
+    print("\n[3/7] Preparing segmentation volumes...")
+    # Create binary masks for each tissue (convert from label volume)
+    seg_dict = {
+        'scalp': (labels == TISSUE_SCALP).astype(np.float64),
+        'skull': (labels == TISSUE_SKULL).astype(np.float64),
+        'csf':   ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64),  # Amygdala treated as CSF/GM for now
+        'gm':    (labels == TISSUE_GRAY).astype(np.float64),
+        'wm':    (labels == TISSUE_WHITE).astype(np.float64)
+    }
+    print(f"  Segmentation volumes: {labels.shape}")
+    for name, vol in seg_dict.items():
+        print(f"    {name}: {int(vol.sum()):,} voxels")
 
-    # 4. Tetrahedral mesh - use smaller max_vol to ensure brain coverage
-    # Default max_vol=15 creates too-sparse interior; use 5.0 for brain tets
-    print("\n[4/7] Generating tetrahedral mesh...")
-    mesh_max_vol = 5.0  # Smaller volume = denser mesh in brain
-    nodes, elems = mesh_with_tetgen(surf_verts, surf_faces,
-                                     max_vol=mesh_max_vol,
-                                     min_dihedral=min_dihedral)
-
-    # 5. Assign tissue labels
-    print("\n[5/7] Assigning tissue labels...")
-    tissue_labels = assign_tissue_labels(nodes, elems, labels, affine)
+    # 4. Tetrahedral mesh with brain2mesh
+    print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
+    mesh_max_vol = 50.0  # Reasonable default for brain2mesh
+    nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=mesh_max_vol)
+    
+    # 5. Add amygdala labeling post-mesh (brain2mesh doesn't know amygdala)
+    print("\n[5/7] Adding amygdala tissue labels...")
+    tissue_labels = add_amygdala_to_mesh(nodes, elems, tissue_labels, affine)
 
     # 6. Neighbor connectivity
     print("\n[6/7] Building neighbor connectivity...")
