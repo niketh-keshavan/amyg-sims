@@ -8,7 +8,6 @@ add_executable(mmc_fnirs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mmc_mesh.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mmc_kernel.cu
     ${ROOT_SRC}/optical_properties.cu
-    ${ROOT_SRC}/detector.cu
 )
 
 target_include_directories(mmc_fnirs PRIVATE
