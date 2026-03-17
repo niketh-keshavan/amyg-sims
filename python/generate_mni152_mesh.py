@@ -341,12 +341,27 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     # Use vol2mesh to create mesh from labeled volume
     # This uses CGAL's mesh generation directly
     print("  Running vol2mesh (CGAL mesh generation)...")
+    # Find boundary voxels for surface seed points
+    # Create simple seed points at tissue boundaries
+    x_idx, y_idx, z_idx = np.where(labels_3d > 0)
+    # Subsample to avoid too many seed points
+    n_seeds = min(len(x_idx), 10000)
+    if len(x_idx) > n_seeds:
+        indices = np.random.choice(len(x_idx), n_seeds, replace=False)
+        x_idx, y_idx, z_idx = x_idx[indices], y_idx[indices], z_idx[indices]
+    
+    # Create option structure with default settings
+    opt = iso2mesh.core.optset()
+    opt['maxvol'] = max_vol
+    opt['radbound'] = 3.0  # Surface sampling density
+    
     mesh = iso2mesh.vol2mesh(
         labels_3d,
-        iso2mesh.vol2surf(labels_3d, labels_3d > 0),  # Simple surface extraction
+        x_idx, y_idx, z_idx,
+        opt,
         maxvol=max_vol,
-        keepratio=0.1,
-        verbose=True
+        dofix=1,
+        method='cgalmesh',
     )
     
     nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
