@@ -341,54 +341,96 @@ def assign_tissue_labels(nodes_mm, elems, labels_vol, affine):
     """
     For each tetrahedron, assign the tissue type of its centroid.
 
-    Uses trilinear-sampled tissue label from the segmented atlas.
+    Uses nearest-neighbor voxel lookup from the segmented atlas volume.
     """
     print("  Computing centroids...")
     inv_aff = np.linalg.inv(affine)
 
-    # Compute centroids in MNI mm
-    centroids = nodes_mm[elems[:, :4]].mean(axis=1)  # (M, 3)
+    centroids = nodes_mm[elems[:, :4]].mean(axis=1)  # (M, 3) in MNI mm
+
+    # --- DIAGNOSTICS: verify coordinate systems ---
+    print(f"  Centroid MNI range: "
+          f"x=[{centroids[:,0].min():.1f}, {centroids[:,0].max():.1f}]  "
+          f"y=[{centroids[:,1].min():.1f}, {centroids[:,1].max():.1f}]  "
+          f"z=[{centroids[:,2].min():.1f}, {centroids[:,2].max():.1f}]")
+    print(f"  Affine diagonal: {np.diag(affine)}")
+    print(f"  Affine translation: {affine[:3, 3]}")
 
     # Map MNI mm → voxel indices
     print("  Mapping to voxel space...")
     cents_hom = np.hstack([centroids, np.ones((len(centroids),1))])
     vox_coords = (inv_aff @ cents_hom.T).T[:, :3]  # (M, 3)
 
+    print(f"  Voxel coord range: "
+          f"i=[{vox_coords[:,0].min():.1f}, {vox_coords[:,0].max():.1f}]  "
+          f"j=[{vox_coords[:,1].min():.1f}, {vox_coords[:,1].max():.1f}]  "
+          f"k=[{vox_coords[:,2].min():.1f}, {vox_coords[:,2].max():.1f}]")
+    print(f"  Label volume shape: {labels_vol.shape}")
+
     # Nearest-neighbor lookup
-    print("  Sampling tissue labels...")
     vi = np.round(vox_coords[:,0]).astype(int)
     vj = np.round(vox_coords[:,1]).astype(int)
     vk = np.round(vox_coords[:,2]).astype(int)
 
     shape = labels_vol.shape
+    oob = ((vi < 0) | (vi >= shape[0]) |
+           (vj < 0) | (vj >= shape[1]) |
+           (vk < 0) | (vk >= shape[2]))
+    print(f"  Out-of-bounds centroids (clipped): {oob.sum():,} / {len(vi):,}")
+
     vi = np.clip(vi, 0, shape[0]-1)
     vj = np.clip(vj, 0, shape[1]-1)
     vk = np.clip(vk, 0, shape[2]-1)
 
     tissue_labels = labels_vol[vi, vj, vk].astype(np.int32)
 
-    # Post-process: override amygdala labels using direct MNI sphere check.
-    # The centroid voxel lookup misses small ROIs (6.5mm radius) due to
-    # coarse tet resolution. Directly check centroid-to-sphere distance.
+    # --- DIAGNOSTICS: voxel volume distribution for comparison ---
+    print("  Label VOLUME distribution (reference):")
+    tissue_names = ['air','scalp','skull','csf','gray','white','amygdala']
+    for t, name in enumerate(tissue_names):
+        n = int(np.sum(labels_vol == t))
+        if n > 0:
+            print(f"    {name}: {n:,} voxels ({100.0*n/labels_vol.size:.1f}%)")
+
+    print("  Label TET distribution (before amygdala override):")
+    for t, name in enumerate(tissue_names):
+        n = int(np.sum(tissue_labels == t))
+        if n > 0:
+            print(f"    {name}: {n:,} tets ({100.0*n/len(tissue_labels):.1f}%)")
+
+    # --- DIAGNOSTICS: spot-check a known brain point ---
+    test_mni = np.array([0.0, 0.0, 0.0, 1.0])
+    test_vox = inv_aff @ test_mni
+    ti, tj, tk = int(round(test_vox[0])), int(round(test_vox[1])), int(round(test_vox[2]))
+    if 0 <= ti < shape[0] and 0 <= tj < shape[1] and 0 <= tk < shape[2]:
+        print(f"  Spot-check: MNI(0,0,0) -> vox({ti},{tj},{tk}) = label {labels_vol[ti,tj,tk]} "
+              f"({tissue_names[int(labels_vol[ti,tj,tk])]})")
+
+    test_mni2 = np.array([24.0, -2.0, -20.0, 1.0])
+    test_vox2 = inv_aff @ test_mni2
+    ti2, tj2, tk2 = int(round(test_vox2[0])), int(round(test_vox2[1])), int(round(test_vox2[2]))
+    if 0 <= ti2 < shape[0] and 0 <= tj2 < shape[1] and 0 <= tk2 < shape[2]:
+        print(f"  Spot-check: MNI(24,-2,-20) -> vox({ti2},{tj2},{tk2}) = label {labels_vol[ti2,tj2,tk2]} "
+              f"({tissue_names[int(labels_vol[ti2,tj2,tk2])]})")
+
+    # Amygdala override: UNCONDITIONAL within sphere (no tissue filter).
+    # The amygdala is deep brain — any tet centroid within 6.5mm must be amygdala.
     amyg_centers = np.array([[24., -2., -20.], [-24., -2., -20.]])
     amyg_radius = 6.5
     for ac in amyg_centers:
         dist2 = np.sum((centroids - ac)**2, axis=1)
         in_sphere = dist2 <= amyg_radius**2
-        # Override any non-air tissue within sphere (deep brain, so no scalp/skull expected)
-        non_air = tissue_labels != 0
-        override = in_sphere & non_air
-        tissue_labels[override] = TISSUE_AMYGDALA
-        n_override = np.sum(override)
-        if n_override > 0:
-            print(f"    Amygdala override: {n_override} tets near ({ac[0]:.0f},{ac[1]:.0f},{ac[2]:.0f})")
+        n_in = int(np.sum(in_sphere))
+        min_dist = float(np.sqrt(dist2.min()))
+        tissue_labels[in_sphere] = TISSUE_AMYGDALA
+        print(f"    Amygdala sphere ({ac[0]:+.0f},{ac[1]:+.0f},{ac[2]:+.0f}): "
+              f"{n_in} tets overridden, closest tet {min_dist:.1f}mm away")
 
-    print("  Counting tissue types...")
-    for t, name in enumerate(tqdm(['air','scalp','skull','csf','gray','white','amygdala'],
-                                   desc="  Tissue counts", leave=False)):
-        n = np.sum(tissue_labels == t)
+    print("  Final tet distribution:")
+    for t, name in enumerate(tissue_names):
+        n = int(np.sum(tissue_labels == t))
         if n > 0:
-            print(f"    {name}: {n:,} tets")
+            print(f"    {name}: {n:,} tets ({100.0*n/len(tissue_labels):.1f}%)")
 
     return tissue_labels
 
