@@ -617,67 +617,204 @@ def save_mmcmesh(path, nodes_mm, elems, tissue_labels, neighbors):
 # Full pipeline
 # ---------------------------------------------------------------------------
 
-def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0):
-    t_total = time.time()
+import pickle
+import os
 
+def save_checkpoint(checkpoint_dir, step_name, data):
+    """Save checkpoint data to resume later."""
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    checkpoint_file = os.path.join(checkpoint_dir, f"{step_name}.pkl")
+    with open(checkpoint_file, 'wb') as f:
+        pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"  💾 Checkpoint saved: {checkpoint_file}")
+
+def load_checkpoint(checkpoint_dir, step_name):
+    """Load checkpoint data if it exists."""
+    checkpoint_file = os.path.join(checkpoint_dir, f"{step_name}.pkl")
+    if os.path.exists(checkpoint_file):
+        with open(checkpoint_file, 'rb') as f:
+            data = pickle.load(f)
+        print(f"  📂 Checkpoint loaded: {checkpoint_file}")
+        return data
+    return None
+
+def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0, 
+                         checkpoint_dir=None, resume=True):
+    """
+    Generate MNI152 head mesh with checkpoint/resume support.
+    
+    Args:
+        output_path: Path to output .mmcmesh file
+        max_vol: Maximum tetrahedron volume
+        min_dihedral: Minimum dihedral angle
+        checkpoint_dir: Directory to save checkpoints (default: output_path + '.checkpoints')
+        resume: If True, resume from last checkpoint if available
+    """
+    t_total = time.time()
+    
+    # Setup checkpoint directory
+    if checkpoint_dir is None:
+        checkpoint_dir = output_path + '.checkpoints'
+    
     print("="*60)
     print("  MNI152 Head Mesh Generation for MMC fNIRS")
+    if resume and os.path.exists(checkpoint_dir):
+        print(f"  Resume mode: checkpoints in {checkpoint_dir}")
     print("="*60)
 
-    # 1. Load atlas
-    print("\n[1/7] Loading atlas...")
-    with tqdm(total=1, desc="  Downloading/loading MNI152 atlas", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
-        t1, gm, wm, csf, brain_mask, affine = load_mni152_atlas()
-        pbar.update(1)
+    # Step 1: Load atlas
+    step = "step1_atlas"
+    if resume:
+        checkpoint = load_checkpoint(checkpoint_dir, step)
+        if checkpoint:
+            t1, gm, wm, csf, brain_mask, affine = checkpoint
+        else:
+            print("\n[1/7] Loading atlas...")
+            with tqdm(total=1, desc="  Downloading/loading MNI152 atlas", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+                t1, gm, wm, csf, brain_mask, affine = load_mni152_atlas()
+                pbar.update(1)
+            save_checkpoint(checkpoint_dir, step, (t1, gm, wm, csf, brain_mask, affine))
+    else:
+        print("\n[1/7] Loading atlas...")
+        with tqdm(total=1, desc="  Downloading/loading MNI152 atlas", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+            t1, gm, wm, csf, brain_mask, affine = load_mni152_atlas()
+            pbar.update(1)
+        save_checkpoint(checkpoint_dir, step, (t1, gm, wm, csf, brain_mask, affine))
 
-    # 2. Build tissue label volume
-    print("\n[2/7] Building tissue label volume...")
-    with tqdm(total=1, desc="  Segmenting tissues", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
-        labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
-        pbar.update(1)
+    # Step 2: Build tissue labels
+    step = "step2_labels"
+    if resume:
+        checkpoint = load_checkpoint(checkpoint_dir, step)
+        if checkpoint:
+            labels = checkpoint
+        else:
+            print("\n[2/7] Building tissue label volume...")
+            with tqdm(total=1, desc="  Segmenting tissues", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+                labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
+                pbar.update(1)
+            save_checkpoint(checkpoint_dir, step, labels)
+    else:
+        print("\n[2/7] Building tissue label volume...")
+        with tqdm(total=1, desc="  Segmenting tissues", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+            labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
+            pbar.update(1)
+        save_checkpoint(checkpoint_dir, step, labels)
 
-    # 3. Prepare segmentation volumes for brain2mesh
-    print("\n[3/7] Preparing segmentation volumes...")
-    seg_dict = {}
-    tissue_names = ['scalp', 'skull', 'csf', 'gm', 'wm']
-    for name in tqdm(tissue_names, desc="  Creating tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
-        if name == 'scalp':
-            seg_dict[name] = (labels == TISSUE_SCALP).astype(np.float64)
-        elif name == 'skull':
-            seg_dict[name] = (labels == TISSUE_SKULL).astype(np.float64)
-        elif name == 'csf':
-            seg_dict[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
-        elif name == 'gm':
-            seg_dict[name] = (labels == TISSUE_GRAY).astype(np.float64)
-        elif name == 'wm':
-            seg_dict[name] = (labels == TISSUE_WHITE).astype(np.float64)
+    # Step 3: Prepare segmentations
+    step = "step3_segdict"
+    if resume:
+        checkpoint = load_checkpoint(checkpoint_dir, step)
+        if checkpoint:
+            seg_dict = checkpoint
+            print("\n[3/7] Preparing segmentation volumes... (loaded from checkpoint)")
+        else:
+            print("\n[3/7] Preparing segmentation volumes...")
+            seg_dict = {}
+            tissue_names = ['scalp', 'skull', 'csf', 'gm', 'wm']
+            for name in tqdm(tissue_names, desc="  Creating tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+                if name == 'scalp':
+                    seg_dict[name] = (labels == TISSUE_SCALP).astype(np.float64)
+                elif name == 'skull':
+                    seg_dict[name] = (labels == TISSUE_SKULL).astype(np.float64)
+                elif name == 'csf':
+                    seg_dict[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
+                elif name == 'gm':
+                    seg_dict[name] = (labels == TISSUE_GRAY).astype(np.float64)
+                elif name == 'wm':
+                    seg_dict[name] = (labels == TISSUE_WHITE).astype(np.float64)
+            save_checkpoint(checkpoint_dir, step, seg_dict)
+    else:
+        print("\n[3/7] Preparing segmentation volumes...")
+        seg_dict = {}
+        tissue_names = ['scalp', 'skull', 'csf', 'gm', 'wm']
+        for name in tqdm(tissue_names, desc="  Creating tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+            if name == 'scalp':
+                seg_dict[name] = (labels == TISSUE_SCALP).astype(np.float64)
+            elif name == 'skull':
+                seg_dict[name] = (labels == TISSUE_SKULL).astype(np.float64)
+            elif name == 'csf':
+                seg_dict[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
+            elif name == 'gm':
+                seg_dict[name] = (labels == TISSUE_GRAY).astype(np.float64)
+            elif name == 'wm':
+                seg_dict[name] = (labels == TISSUE_WHITE).astype(np.float64)
+        save_checkpoint(checkpoint_dir, step, seg_dict)
     
     print(f"  Segmentation volumes: {labels.shape}")
     for name, vol in seg_dict.items():
         print(f"    {name}: {int(vol.sum()):,} voxels")
 
-    # 4. Tetrahedral mesh with brain2mesh
-    print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
-    print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
-    t_mesh = time.time()
-    nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
-    print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
-    
-    # 5. Add amygdala labeling post-mesh
-    print("\n[5/7] Adding amygdala tissue labels...")
-    with tqdm(total=1, desc="  Labeling amygdala regions", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
-        tissue_labels = add_amygdala_to_mesh(nodes, elems, tissue_labels, affine)
-        pbar.update(1)
+    # Step 4: brain2mesh (the slow step - checkpoint after this!)
+    step = "step4_mesh"
+    if resume:
+        checkpoint = load_checkpoint(checkpoint_dir, step)
+        if checkpoint:
+            nodes, elems, tissue_labels = checkpoint
+            print("\n[4/7] Generating tetrahedral mesh... (loaded from checkpoint)")
+            print(f"    Mesh: {len(nodes):,} nodes, {len(elems):,} tets")
+        else:
+            print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
+            print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
+            t_mesh = time.time()
+            nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
+            print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
+            save_checkpoint(checkpoint_dir, step, (nodes, elems, tissue_labels))
+    else:
+        print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
+        print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
+        t_mesh = time.time()
+        nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
+        print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
+        save_checkpoint(checkpoint_dir, step, (nodes, elems, tissue_labels))
 
-    # 6. Neighbor connectivity
-    print("\n[6/7] Building neighbor connectivity...")
-    neighbors = compute_tet_neighbors(elems)
+    # Step 5: Amygdala labeling
+    step = "step5_amygdala"
+    if resume:
+        checkpoint = load_checkpoint(checkpoint_dir, step)
+        if checkpoint:
+            tissue_labels = checkpoint
+            print("\n[5/7] Adding amygdala tissue labels... (loaded from checkpoint)")
+        else:
+            print("\n[5/7] Adding amygdala tissue labels...")
+            with tqdm(total=1, desc="  Labeling amygdala regions", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+                tissue_labels = add_amygdala_to_mesh(nodes, elems, tissue_labels, affine)
+                pbar.update(1)
+            save_checkpoint(checkpoint_dir, step, tissue_labels)
+    else:
+        print("\n[5/7] Adding amygdala tissue labels...")
+        with tqdm(total=1, desc="  Labeling amygdala regions", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
+            tissue_labels = add_amygdala_to_mesh(nodes, elems, tissue_labels, affine)
+            pbar.update(1)
+        save_checkpoint(checkpoint_dir, step, tissue_labels)
 
-    # 7. Save
+    # Step 6: Neighbors
+    step = "step6_neighbors"
+    if resume:
+        checkpoint = load_checkpoint(checkpoint_dir, step)
+        if checkpoint:
+            neighbors = checkpoint
+            print("\n[6/7] Building neighbor connectivity... (loaded from checkpoint)")
+        else:
+            print("\n[6/7] Building neighbor connectivity...")
+            neighbors = compute_tet_neighbors(elems)
+            save_checkpoint(checkpoint_dir, step, neighbors)
+    else:
+        print("\n[6/7] Building neighbor connectivity...")
+        neighbors = compute_tet_neighbors(elems)
+        save_checkpoint(checkpoint_dir, step, neighbors)
+
+    # Step 7: Save final mesh
     print("\n[7/7] Saving binary mesh...")
     with tqdm(total=1, desc="  Writing .mmcmesh file", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
         save_mmcmesh(output_path, nodes, elems, tissue_labels, neighbors)
         pbar.update(1)
+
+    # Clean up checkpoints on success (optional)
+    if os.path.exists(checkpoint_dir):
+        print(f"\n  🧹 Cleaning up checkpoints in {checkpoint_dir}")
+        import shutil
+        shutil.rmtree(checkpoint_dir)
+        print("  ✅ Checkpoints removed")
 
     print(f"\n{'='*60}")
     print(f"  Total time: {time.time()-t_total:.1f}s")
@@ -710,16 +847,22 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--output',   default='mni152_head.mmcmesh',
                    help='Output .mmcmesh file path (default: mni152_head.mmcmesh)')
-    p.add_argument('--max-vol',  type=float, default=15.0,
-                   help='Max tet volume mm³ — smaller = denser mesh (default: 15)')
+    p.add_argument('--max-vol',  type=float, default=50.0,
+                   help='Max tet volume mm³ — smaller = denser mesh (default: 50)')
     p.add_argument('--min-dihedral', type=float, default=15.0,
                    help='Min dihedral angle in degrees (default: 15)')
+    p.add_argument('--resume', action='store_true', default=True,
+                   help='Resume from checkpoints if available (default: True)')
+    p.add_argument('--no-resume', dest='resume', action='store_false',
+                   help='Disable checkpoint resume (start from scratch)')
+    p.add_argument('--checkpoint-dir', default=None,
+                   help='Directory for checkpoints (default: <output>.checkpoints)')
 
     args = p.parse_args()
 
     # Dependency check
     missing = []
-    for pkg in ['nilearn','nibabel','skimage','tetgen','scipy','tqdm']:
+    for pkg in ['nilearn','nibabel','skimage','scipy','tqdm']:
         try:
             __import__(pkg)
         except ImportError:
@@ -732,7 +875,9 @@ def main():
 
     generate_mni152_mesh(args.output,
                           max_vol=args.max_vol,
-                          min_dihedral=args.min_dihedral)
+                          min_dihedral=args.min_dihedral,
+                          checkpoint_dir=args.checkpoint_dir,
+                          resume=args.resume)
 
 
 if __name__ == '__main__':
