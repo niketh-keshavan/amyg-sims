@@ -167,19 +167,23 @@ static void find_source_on_scalp(const HostMesh& mesh,
 
     printf("  Amygdala centroid: (%.1f, %.1f, %.1f) mm\n", amyg_cx, amyg_cy, amyg_cz);
 
-    // Find nearest boundary face (neighbor == -1) scalp element
-    // Choose the scalp boundary point closest to the amygdala projection
-    float best_dist2 = 1e30f;
+    // Project LATERALLY from amygdala toward ipsilateral ear (along ±x axis)
+    // to find temporal scalp surface — the correct fNIRS optode placement.
+    // Previous approach (nearest boundary face) found the inferior surface (bottom of head).
+    float proj_dx = (amyg_cx < 0) ? -1.0f : 1.0f;
+    float proj_dy = 0.0f;
+    float proj_dz = 0.0f;
+
+    float best_score = 1e30f;
     float best_x = 0, best_y = 0, best_z = 0;
     float best_nx = 0, best_ny = 0, best_nz = 0;
+    static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
 
     for (int e = 0; e < mesh.num_elements; e++) {
         if (mesh.tissue[e] != TISSUE_SCALP) continue;
         for (int f = 0; f < 4; f++) {
             if (mesh.neighbors[e * 4 + f] != -1) continue;
-            // This is a scalp boundary face — compute centroid
-            // Face vertices (opposite vertex f)
-            static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
+
             float fx = 0, fy = 0, fz = 0;
             for (int i = 0; i < 3; i++) {
                 int vi = mesh.elements[e * 4 + FV[f][i]];
@@ -189,15 +193,25 @@ static void find_source_on_scalp(const HostMesh& mesh,
             }
             fx /= 3.0f; fy /= 3.0f; fz /= 3.0f;
 
-            float dx = fx - amyg_cx;
-            float dy = fy - amyg_cy;
-            float dz = fz - amyg_cz;
-            float dist2 = dx*dx + dy*dy + dz*dz;
+            // Vector from amygdala to face center
+            float vx = fx - amyg_cx;
+            float vy = fy - amyg_cy;
+            float vz = fz - amyg_cz;
 
-            if (dist2 < best_dist2) {
-                best_dist2 = dist2;
+            // Project onto lateral ray: t = dot(v, proj_dir)
+            float t = vx * proj_dx + vy * proj_dy + vz * proj_dz;
+            if (t <= 0.0f) continue; // wrong direction (medial side)
+
+            // Perpendicular distance to the ray
+            float perp_x = vx - t * proj_dx;
+            float perp_y = vy - t * proj_dy;
+            float perp_z = vz - t * proj_dz;
+            float perp_dist2 = perp_x*perp_x + perp_y*perp_y + perp_z*perp_z;
+
+            if (perp_dist2 < best_score) {
+                best_score = perp_dist2;
                 best_x = fx; best_y = fy; best_z = fz;
-                // Use precomputed face normal (not available here, compute inline)
+
                 int va = mesh.elements[e * 4 + FV[f][0]];
                 int vb = mesh.elements[e * 4 + FV[f][1]];
                 int vc = mesh.elements[e * 4 + FV[f][2]];
@@ -214,7 +228,7 @@ static void find_source_on_scalp(const HostMesh& mesh,
         }
     }
 
-    // Source at the closest scalp boundary face, slightly inside
+    // Normalize face normal
     float nmag = sqrtf(best_nx*best_nx + best_ny*best_ny + best_nz*best_nz);
     if (nmag > 0) { best_nx /= nmag; best_ny /= nmag; best_nz /= nmag; }
 
@@ -226,25 +240,22 @@ static void find_source_on_scalp(const HostMesh& mesh,
         best_nx = -best_nx; best_ny = -best_ny; best_nz = -best_nz;
     }
 
-    // Place source just inside the scalp (0.5mm inward)
-    src_x = best_x + best_nx * 0.5f;  // inward = toward amygdala = opposite of outward normal
-    src_y = best_y + best_ny * 0.5f;
-    src_z = best_z + best_nz * 0.5f;
-
-    // Wait — outward normal points away from amygdala, so inward is +normal toward amygdala
-    // We just flipped the normal so it points AWAY from amygdala. So inward = -normal.
+    // Place source just inside the scalp (0.5mm inward along -outward_normal)
     src_x = best_x - best_nx * 0.5f;
     src_y = best_y - best_ny * 0.5f;
     src_z = best_z - best_nz * 0.5f;
 
-    // Direction: inward (toward amygdala, opposite of outward normal)
+    // Direction: inward (toward amygdala)
     src_dx = -best_nx;
     src_dy = -best_ny;
     src_dz = -best_nz;
 
+    float dist_to_amyg = sqrtf((best_x-amyg_cx)*(best_x-amyg_cx) +
+                               (best_y-amyg_cy)*(best_y-amyg_cy) +
+                               (best_z-amyg_cz)*(best_z-amyg_cz));
     printf("  Source position: (%.1f, %.1f, %.1f) mm\n", src_x, src_y, src_z);
     printf("  Source direction: (%.3f, %.3f, %.3f)\n", src_dx, src_dy, src_dz);
-    printf("  Distance to amygdala: %.1f mm\n", sqrtf(best_dist2));
+    printf("  Distance to amygdala: %.1f mm\n", dist_to_amyg);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +270,7 @@ static std::vector<Detector> build_mmc_detectors(
     std::vector<float>& out_angles)
 {
     // Target SDS values matching voxel MC detector layout
-    float target_sds[] = { 8, 8, 15, 20, 25, 28, 30, 32, 35, 38, 40,
+    float target_sds[] = { 8, 10, 15, 20, 25, 28, 30, 32, 35, 38, 40,
                            20, 25, 30, 35, 20, 25, 30, 35 };
     float target_angles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                               30, 30, 30, 30, -30, -30, -30, -30 };
