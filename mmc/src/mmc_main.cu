@@ -172,42 +172,25 @@ static void find_source_on_scalp(const HostMesh& mesh,
     printf("  Right amygdala centroid: (%.1f, %.1f, %.1f) mm [%d vertices]\n",
            amyg_cx, amyg_cy, amyg_cz, amyg_count);
 
-    // Compute scalp surface centroid as head center (bbox center is unreliable
-    // because MNI bbox is asymmetric: z=[-71,+115], y=[-133,+97])
-    float cx = 0, cy = 0, cz = 0;
-    int scalp_face_count = 0;
+    // Ellipsoidal projection matching voxel MC (src/detector.cu:32-42)
+    // Head semi-axes from voxel MC: (78, 95, 85) mm
+    // This amplifies the lateral (x) component because the head is narrowest there,
+    // placing the source on the temporal scalp directly overlying the amygdala.
+    // MNI coordinates have origin at anterior commissure — use (0,0,0) as head center.
+    float ea = amyg_cx / 78.0f;
+    float eb = amyg_cy / 95.0f;
+    float ec = amyg_cz / 85.0f;
+    float t_scalp = 1.0f / sqrtf(ea*ea + eb*eb + ec*ec);
+
+    float target_x = t_scalp * amyg_cx;
+    float target_y = t_scalp * amyg_cy;
+    float target_z = t_scalp * amyg_cz;
+
+    printf("  Ellipsoidal target on scalp: (%.1f, %.1f, %.1f) mm\n",
+           target_x, target_y, target_z);
+
+    // Find nearest scalp boundary face to the ellipsoidal target point
     static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
-    for (int e = 0; e < mesh.num_elements; e++) {
-        if (mesh.tissue[e] != TISSUE_SCALP) continue;
-        for (int f = 0; f < 4; f++) {
-            if (mesh.neighbors[e * 4 + f] != -1) continue;
-            for (int i = 0; i < 3; i++) {
-                int vi = mesh.elements[e * 4 + FV[f][i]];
-                cx += mesh.nodes[vi * 3 + 0];
-                cy += mesh.nodes[vi * 3 + 1];
-                cz += mesh.nodes[vi * 3 + 2];
-            }
-            scalp_face_count++;
-        }
-    }
-    if (scalp_face_count > 0) {
-        cx /= (scalp_face_count * 3);
-        cy /= (scalp_face_count * 3);
-        cz /= (scalp_face_count * 3);
-    }
-
-    // Project radially from head center through amygdala onto scalp surface
-    // Matches voxel MC strategy (src/detector.cu:32-42)
-    float proj_dx = amyg_cx - cx;
-    float proj_dy = amyg_cy - cy;
-    float proj_dz = amyg_cz - cz;
-    float proj_mag = sqrtf(proj_dx*proj_dx + proj_dy*proj_dy + proj_dz*proj_dz);
-    if (proj_mag > 0) { proj_dx /= proj_mag; proj_dy /= proj_mag; proj_dz /= proj_mag; }
-
-    printf("  Head center (scalp centroid): (%.1f, %.1f, %.1f) mm [%d faces]\n",
-           cx, cy, cz, scalp_face_count);
-    printf("  Projection direction: (%.3f, %.3f, %.3f)\n", proj_dx, proj_dy, proj_dz);
-
     float best_score = 1e30f;
     float best_x = 0, best_y = 0, best_z = 0;
     float best_nx = 0, best_ny = 0, best_nz = 0;
@@ -226,23 +209,13 @@ static void find_source_on_scalp(const HostMesh& mesh,
             }
             fx /= 3.0f; fy /= 3.0f; fz /= 3.0f;
 
-            // Vector from amygdala to face center
-            float vx = fx - amyg_cx;
-            float vy = fy - amyg_cy;
-            float vz = fz - amyg_cz;
+            float dx = fx - target_x;
+            float dy = fy - target_y;
+            float dz = fz - target_z;
+            float dist2 = dx*dx + dy*dy + dz*dz;
 
-            // Project onto lateral ray: t = dot(v, proj_dir)
-            float t = vx * proj_dx + vy * proj_dy + vz * proj_dz;
-            if (t <= 0.0f) continue; // wrong direction (medial side)
-
-            // Perpendicular distance to the ray
-            float perp_x = vx - t * proj_dx;
-            float perp_y = vy - t * proj_dy;
-            float perp_z = vz - t * proj_dz;
-            float perp_dist2 = perp_x*perp_x + perp_y*perp_y + perp_z*perp_z;
-
-            if (perp_dist2 < best_score) {
-                best_score = perp_dist2;
+            if (dist2 < best_score) {
+                best_score = dist2;
                 best_x = fx; best_y = fy; best_z = fz;
 
                 int va = mesh.elements[e * 4 + FV[f][0]];
