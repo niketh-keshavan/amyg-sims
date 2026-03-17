@@ -366,6 +366,8 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     
     # cgalv2m returns a single region - we need to relabel based on centroid positions
     print("  Assigning tissue labels based on centroid positions...")
+    # Build affine: voxel to mm transform (isotropic voxels)
+    affine = np.diag([voxel_size, voxel_size, voxel_size, 1.0])
     tissue_labels = assign_tissue_labels_to_mesh(nodes, elems, labels_3d, affine)
     
     elapsed = time.time() - t0

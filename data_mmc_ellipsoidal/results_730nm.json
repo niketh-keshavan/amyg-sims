@@ -1,0 +1,3898 @@
+{
+  "wavelength_nm": 730,
+  "num_photons": 10000000,
+  "geometry_model": "mmc_mni152",
+  "scattering_model": "mie_power_law",
+  "tpsf_bins": 512,
+  "tpsf_bin_ps": 10.0,
+  "time_gate_edges_ps": [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000],
+  "detectors": [
+    {
+      "id": 0,
+      "sds_mm": 21.3,
+      "angle_deg": 0.0,
+      "detected_photons": 20807,
+      "total_weight": 4.1895089421e+03,
+      "mean_pathlength_mm": 199.6051,
+      "partial_pathlength_mm": {
+        "air": 0.000115,
+        "scalp": 191.443876,
+        "skull": 7.352255,
+        "csf": 0.000347,
+        "gray_matter": 0.807272,
+        "white_matter": 0.001188,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 1441,
+          "weight": 8.8741551971e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 83.640416,
+            "skull": 0.125596,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 4827,
+          "weight": 1.9138916128e+03,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 156.904225,
+            "skull": 1.959474,
+            "csf": 0.000000,
+            "gray_matter": 0.011669,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 3980,
+          "weight": 8.6505571662e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000197,
+            "scalp": 253.812197,
+            "skull": 9.517297,
+            "csf": 0.000000,
+            "gray_matter": 0.526887,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 2732,
+          "weight": 3.2162856877e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000192,
+            "scalp": 344.769116,
+            "skull": 23.230860,
+            "csf": 0.000000,
+            "gray_matter": 1.849418,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 1946,
+          "weight": 1.2256010059e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000193,
+            "scalp": 431.534781,
+            "skull": 39.747494,
+            "csf": 0.000000,
+            "gray_matter": 6.253112,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 1371,
+          "weight": 4.5977642251e+01,
+          "partial_pathlength_mm": {
+            "air": 0.002922,
+            "scalp": 508.863737,
+            "skull": 63.380215,
+            "csf": 0.000000,
+            "gray_matter": 12.569565,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 1098,
+          "weight": 1.9818609603e+01,
+          "partial_pathlength_mm": {
+            "air": 0.002148,
+            "scalp": 586.525757,
+            "skull": 84.217477,
+            "csf": 0.000000,
+            "gray_matter": 19.544937,
+            "white_matter": 0.053436,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 776,
+          "weight": 7.5401791818e+00,
+          "partial_pathlength_mm": {
+            "air": 0.001536,
+            "scalp": 651.723246,
+            "skull": 111.862214,
+            "csf": 0.028673,
+            "gray_matter": 31.269723,
+            "white_matter": 0.010873,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 1120,
+          "weight": 4.5047280127e+00,
+          "partial_pathlength_mm": {
+            "air": 0.005206,
+            "scalp": 729.328790,
+            "skull": 153.871617,
+            "csf": 0.216254,
+            "gray_matter": 51.132115,
+            "white_matter": 0.626106,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 1516,
+          "weight": 1.1162645300e+00,
+          "partial_pathlength_mm": {
+            "air": 0.010748,
+            "scalp": 874.428339,
+            "skull": 219.257606,
+            "csf": 0.235540,
+            "gray_matter": 99.759649,
+            "white_matter": 0.909926,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "sds_mm": 21.2,
+      "angle_deg": 180.0,
+      "detected_photons": 21079,
+      "total_weight": 4.2650217852e+03,
+      "mean_pathlength_mm": 198.3504,
+      "partial_pathlength_mm": {
+        "air": 0.000011,
+        "scalp": 187.200729,
+        "skull": 10.448784,
+        "csf": 0.000097,
+        "gray_matter": 0.699442,
+        "white_matter": 0.001341,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 1463,
+          "weight": 9.0669241124e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 83.131942,
+            "skull": 0.315378,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 4876,
+          "weight": 1.9518941474e+03,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 154.643190,
+            "skull": 3.195773,
+            "csf": 0.000000,
+            "gray_matter": 0.008992,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 3983,
+          "weight": 8.7335376176e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 247.565596,
+            "skull": 14.367657,
+            "csf": 0.000000,
+            "gray_matter": 0.351474,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 2837,
+          "weight": 3.3210400037e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 336.820694,
+            "skull": 31.805044,
+            "csf": 0.000000,
+            "gray_matter": 1.677047,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 1924,
+          "weight": 1.2171478922e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 413.530383,
+            "skull": 55.659874,
+            "csf": 0.000000,
+            "gray_matter": 6.075646,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 1357,
+          "weight": 4.5844711389e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000062,
+            "scalp": 492.426182,
+            "skull": 78.769045,
+            "csf": 0.000000,
+            "gray_matter": 10.631622,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 1041,
+          "weight": 1.8804386778e+01,
+          "partial_pathlength_mm": {
+            "air": 0.001158,
+            "scalp": 558.770447,
+            "skull": 110.237100,
+            "csf": 0.000000,
+            "gray_matter": 18.640204,
+            "white_matter": 0.194559,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 874,
+          "weight": 8.4308598558e+00,
+          "partial_pathlength_mm": {
+            "air": 0.002177,
+            "scalp": 622.109340,
+            "skull": 146.558194,
+            "csf": 0.000000,
+            "gray_matter": 23.699852,
+            "white_matter": 0.000876,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 1233,
+          "weight": 5.0849746575e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000293,
+            "scalp": 700.500732,
+            "skull": 182.546646,
+            "csf": 0.035642,
+            "gray_matter": 44.019271,
+            "white_matter": 0.251104,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 1491,
+          "weight": 1.0977425511e+00,
+          "partial_pathlength_mm": {
+            "air": 0.001816,
+            "scalp": 818.885853,
+            "skull": 279.963128,
+            "csf": 0.213365,
+            "gray_matter": 91.647669,
+            "white_matter": 0.707702,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "sds_mm": 24.7,
+      "angle_deg": 0.0,
+      "detected_photons": 13608,
+      "total_weight": 2.1133596935e+03,
+      "mean_pathlength_mm": 231.7387,
+      "partial_pathlength_mm": {
+        "air": 0.000205,
+        "scalp": 221.772757,
+        "skull": 8.594086,
+        "csf": 0.000233,
+        "gray_matter": 1.371030,
+        "white_matter": 0.000419,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 400,
+          "weight": 2.4119732666e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 88.496573,
+            "skull": 0.052949,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 2439,
+          "weight": 9.5070561439e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 160.979482,
+            "skull": 1.631869,
+            "csf": 0.000000,
+            "gray_matter": 0.038075,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 2486,
+          "weight": 5.4004178098e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000104,
+            "scalp": 256.685535,
+            "skull": 7.643718,
+            "csf": 0.000000,
+            "gray_matter": 0.552453,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 1891,
+          "weight": 2.2170017824e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000818,
+            "scalp": 350.492183,
+            "skull": 19.024302,
+            "csf": 0.000000,
+            "gray_matter": 2.322037,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 1539,
+          "weight": 9.6634852935e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000718,
+            "scalp": 434.573789,
+            "skull": 37.310983,
+            "csf": 0.000000,
+            "gray_matter": 6.822133,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 1075,
+          "weight": 3.6110550830e+01,
+          "partial_pathlength_mm": {
+            "air": 0.001738,
+            "scalp": 515.803448,
+            "skull": 56.666215,
+            "csf": 0.000000,
+            "gray_matter": 13.556674,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 852,
+          "weight": 1.5308049606e+01,
+          "partial_pathlength_mm": {
+            "air": 0.001531,
+            "scalp": 594.551353,
+            "skull": 74.681829,
+            "csf": 0.000000,
+            "gray_matter": 24.042569,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 689,
+          "weight": 6.6321932888e+00,
+          "partial_pathlength_mm": {
+            "air": 0.002307,
+            "scalp": 659.949022,
+            "skull": 104.775468,
+            "csf": 0.000000,
+            "gray_matter": 33.950160,
+            "white_matter": 0.001415,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 1025,
+          "weight": 4.1464414170e+00,
+          "partial_pathlength_mm": {
+            "air": 0.004297,
+            "scalp": 743.604573,
+            "skull": 138.941745,
+            "csf": 0.000000,
+            "gray_matter": 53.027842,
+            "white_matter": 0.029952,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 1212,
+          "weight": 8.8270513427e-01,
+          "partial_pathlength_mm": {
+            "air": 0.008247,
+            "scalp": 893.520487,
+            "skull": 211.340867,
+            "csf": 0.558906,
+            "gray_matter": 97.719668,
+            "white_matter": 0.852696,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "sds_mm": 28.0,
+      "angle_deg": 0.0,
+      "detected_photons": 9414,
+      "total_weight": 1.0953838305e+03,
+      "mean_pathlength_mm": 264.5957,
+      "partial_pathlength_mm": {
+        "air": 0.000230,
+        "scalp": 252.721117,
+        "skull": 10.106383,
+        "csf": 0.000187,
+        "gray_matter": 1.766984,
+        "white_matter": 0.000787,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 108,
+          "weight": 6.3647516787e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 92.710573,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 1127,
+          "weight": 4.3327817565e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 163.885232,
+            "skull": 1.166957,
+            "csf": 0.000000,
+            "gray_matter": 0.002347,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 1497,
+          "weight": 3.1960025404e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 260.154552,
+            "skull": 6.857489,
+            "csf": 0.000000,
+            "gray_matter": 0.511538,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 1337,
+          "weight": 1.5584080838e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000550,
+            "scalp": 354.149763,
+            "skull": 17.029800,
+            "csf": 0.000000,
+            "gray_matter": 1.527414,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 1125,
+          "weight": 7.0735707410e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 442.069608,
+            "skull": 30.752620,
+            "csf": 0.000000,
+            "gray_matter": 6.344506,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 902,
+          "weight": 3.0157059450e+01,
+          "partial_pathlength_mm": {
+            "air": 0.002248,
+            "scalp": 524.092375,
+            "skull": 50.084903,
+            "csf": 0.000000,
+            "gray_matter": 13.240422,
+            "white_matter": 0.002436,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 685,
+          "weight": 1.2176621120e+01,
+          "partial_pathlength_mm": {
+            "air": 0.001817,
+            "scalp": 602.125415,
+            "skull": 71.519623,
+            "csf": 0.000000,
+            "gray_matter": 21.586869,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 611,
+          "weight": 5.8736523404e+00,
+          "partial_pathlength_mm": {
+            "air": 0.008890,
+            "scalp": 670.161691,
+            "skull": 98.026177,
+            "csf": 0.000000,
+            "gray_matter": 30.588001,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 840,
+          "weight": 3.2577646610e+00,
+          "partial_pathlength_mm": {
+            "air": 0.005069,
+            "scalp": 759.975303,
+            "skull": 132.021384,
+            "csf": 0.010262,
+            "gray_matter": 52.624840,
+            "white_matter": 0.211733,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 1182,
+          "weight": 8.1627063267e-01,
+          "partial_pathlength_mm": {
+            "air": 0.009314,
+            "scalp": 933.912588,
+            "skull": 191.974205,
+            "csf": 0.209842,
+            "gray_matter": 86.925882,
+            "white_matter": 0.121022,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "sds_mm": 29.5,
+      "angle_deg": 0.0,
+      "detected_photons": 5435,
+      "total_weight": 5.3986342363e+02,
+      "mean_pathlength_mm": 287.6255,
+      "partial_pathlength_mm": {
+        "air": 0.001048,
+        "scalp": 274.136953,
+        "skull": 11.276031,
+        "csf": 0.000276,
+        "gray_matter": 2.210938,
+        "white_matter": 0.000253,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 31,
+          "weight": 1.7919379056e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 95.161946,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 492,
+          "weight": 1.8172944748e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 170.657978,
+            "skull": 1.542202,
+            "csf": 0.000000,
+            "gray_matter": 0.063548,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 846,
+          "weight": 1.7935336418e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 261.589599,
+            "skull": 6.670917,
+            "csf": 0.000000,
+            "gray_matter": 0.627141,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 771,
+          "weight": 8.8919327416e+01,
+          "partial_pathlength_mm": {
+            "air": 0.002735,
+            "scalp": 357.031116,
+            "skull": 15.037295,
+            "csf": 0.000000,
+            "gray_matter": 2.746487,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 647,
+          "weight": 4.0489808913e+01,
+          "partial_pathlength_mm": {
+            "air": 0.004888,
+            "scalp": 446.383401,
+            "skull": 29.959694,
+            "csf": 0.000000,
+            "gray_matter": 4.793709,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 503,
+          "weight": 1.6923926186e+01,
+          "partial_pathlength_mm": {
+            "air": 0.004184,
+            "scalp": 529.086660,
+            "skull": 48.433664,
+            "csf": 0.000000,
+            "gray_matter": 9.416141,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 448,
+          "weight": 8.0955264997e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 605.576530,
+            "skull": 64.617790,
+            "csf": 0.000000,
+            "gray_matter": 23.243853,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 377,
+          "weight": 3.6125800703e+00,
+          "partial_pathlength_mm": {
+            "air": 0.011180,
+            "scalp": 674.807642,
+            "skull": 93.158696,
+            "csf": 0.000000,
+            "gray_matter": 32.524723,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 573,
+          "weight": 2.2857499559e+00,
+          "partial_pathlength_mm": {
+            "air": 0.003884,
+            "scalp": 770.115366,
+            "skull": 120.400915,
+            "csf": 0.000000,
+            "gray_matter": 49.964480,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 747,
+          "weight": 5.3431386828e-01,
+          "partial_pathlength_mm": {
+            "air": 0.008326,
+            "scalp": 907.703940,
+            "skull": 198.537124,
+            "csf": 0.278762,
+            "gray_matter": 97.377248,
+            "white_matter": 0.255273,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "sds_mm": 31.8,
+      "angle_deg": 0.0,
+      "detected_photons": 5806,
+      "total_weight": 4.9679526525e+02,
+      "mean_pathlength_mm": 302.9362,
+      "partial_pathlength_mm": {
+        "air": 0.000733,
+        "scalp": 287.357492,
+        "skull": 12.804592,
+        "csf": 0.001098,
+        "gray_matter": 2.771000,
+        "white_matter": 0.001324,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 20,
+          "weight": 1.1670369804e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 95.332556,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 397,
+          "weight": 1.4939408395e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 167.839565,
+            "skull": 1.226034,
+            "csf": 0.000000,
+            "gray_matter": 0.005862,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 766,
+          "weight": 1.6315812536e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 261.073595,
+            "skull": 6.234863,
+            "csf": 0.000000,
+            "gray_matter": 0.594239,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 795,
+          "weight": 9.1612233222e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000964,
+            "scalp": 357.355061,
+            "skull": 15.396573,
+            "csf": 0.000000,
+            "gray_matter": 2.420186,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 701,
+          "weight": 4.4059770469e+01,
+          "partial_pathlength_mm": {
+            "air": 0.004272,
+            "scalp": 442.376132,
+            "skull": 30.822222,
+            "csf": 0.000000,
+            "gray_matter": 6.379164,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 610,
+          "weight": 2.0355572922e+01,
+          "partial_pathlength_mm": {
+            "air": 0.002032,
+            "scalp": 526.193733,
+            "skull": 49.565303,
+            "csf": 0.000000,
+            "gray_matter": 12.589404,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 515,
+          "weight": 9.0689234762e+00,
+          "partial_pathlength_mm": {
+            "air": 0.002063,
+            "scalp": 612.145946,
+            "skull": 65.429475,
+            "csf": 0.000000,
+            "gray_matter": 20.266757,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 456,
+          "weight": 4.3097460219e+00,
+          "partial_pathlength_mm": {
+            "air": 0.003100,
+            "scalp": 679.532596,
+            "skull": 88.034118,
+            "csf": 0.000000,
+            "gray_matter": 35.312655,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 614,
+          "weight": 2.5081822688e+00,
+          "partial_pathlength_mm": {
+            "air": 0.003536,
+            "scalp": 768.877925,
+            "skull": 116.649948,
+            "csf": 0.000000,
+            "gray_matter": 51.537963,
+            "white_matter": 0.006685,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 932,
+          "weight": 6.5825776138e-01,
+          "partial_pathlength_mm": {
+            "air": 0.008266,
+            "scalp": 951.138751,
+            "skull": 179.270659,
+            "csf": 0.828680,
+            "gray_matter": 82.776419,
+            "white_matter": 0.973978,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "sds_mm": 33.9,
+      "angle_deg": 0.0,
+      "detected_photons": 4102,
+      "total_weight": 2.8007046444e+02,
+      "mean_pathlength_mm": 330.5606,
+      "partial_pathlength_mm": {
+        "air": 0.003167,
+        "scalp": 312.625326,
+        "skull": 14.305058,
+        "csf": 0.000476,
+        "gray_matter": 3.624701,
+        "white_matter": 0.001875,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 6,
+          "weight": 3.4790804386e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 95.458558,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 194,
+          "weight": 6.9833823562e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 175.068011,
+            "skull": 1.807584,
+            "csf": 0.000000,
+            "gray_matter": 0.191376,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 427,
+          "weight": 9.0002289638e+01,
+          "partial_pathlength_mm": {
+            "air": 0.009148,
+            "scalp": 266.353421,
+            "skull": 4.155783,
+            "csf": 0.000000,
+            "gray_matter": 0.691748,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 508,
+          "weight": 5.8460904419e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000091,
+            "scalp": 356.783783,
+            "skull": 15.699935,
+            "csf": 0.000000,
+            "gray_matter": 3.146772,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 500,
+          "weight": 3.1415385120e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 448.454508,
+            "skull": 26.718879,
+            "csf": 0.000000,
+            "gray_matter": 5.285413,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 414,
+          "weight": 1.3604187800e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 529.690934,
+            "skull": 46.565380,
+            "csf": 0.000000,
+            "gray_matter": 14.593954,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 421,
+          "weight": 7.5024875719e+00,
+          "partial_pathlength_mm": {
+            "air": 0.004338,
+            "scalp": 604.445650,
+            "skull": 69.191378,
+            "csf": 0.000000,
+            "gray_matter": 21.488687,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 296,
+          "weight": 2.8849777863e+00,
+          "partial_pathlength_mm": {
+            "air": 0.004698,
+            "scalp": 697.336856,
+            "skull": 77.037377,
+            "csf": 0.000000,
+            "gray_matter": 26.705629,
+            "white_matter": 0.007067,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 571,
+          "weight": 2.3398998410e+00,
+          "partial_pathlength_mm": {
+            "air": 0.004547,
+            "scalp": 771.856271,
+            "skull": 118.737456,
+            "csf": 0.015317,
+            "gray_matter": 47.253401,
+            "white_matter": 0.119137,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 765,
+          "weight": 5.4742826568e-01,
+          "partial_pathlength_mm": {
+            "air": 0.003002,
+            "scalp": 953.409834,
+            "skull": 175.860289,
+            "csf": 0.178114,
+            "gray_matter": 77.034627,
+            "white_matter": 0.412792,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "sds_mm": 35.9,
+      "angle_deg": 0.0,
+      "detected_photons": 3245,
+      "total_weight": 1.8517799468e+02,
+      "mean_pathlength_mm": 358.6405,
+      "partial_pathlength_mm": {
+        "air": 0.001800,
+        "scalp": 338.390749,
+        "skull": 16.406250,
+        "csf": 0.002298,
+        "gray_matter": 3.838981,
+        "white_matter": 0.000474,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 2,
+          "weight": 1.1360073090e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 100.895404,
+            "skull": 0.789002,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 100,
+          "weight": 3.5321967453e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 180.025915,
+            "skull": 0.684443,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 279,
+          "weight": 5.7319925159e+01,
+          "partial_pathlength_mm": {
+            "air": 0.002148,
+            "scalp": 270.045351,
+            "skull": 5.208057,
+            "csf": 0.000000,
+            "gray_matter": 0.312141,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 372,
+          "weight": 4.3068178102e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 357.609714,
+            "skull": 14.252878,
+            "csf": 0.000000,
+            "gray_matter": 2.385976,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 404,
+          "weight": 2.4805504058e+01,
+          "partial_pathlength_mm": {
+            "air": 0.004451,
+            "scalp": 455.284938,
+            "skull": 24.336099,
+            "csf": 0.000000,
+            "gray_matter": 5.598882,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 357,
+          "weight": 1.2239242490e+01,
+          "partial_pathlength_mm": {
+            "air": 0.001837,
+            "scalp": 525.630142,
+            "skull": 46.548193,
+            "csf": 0.000000,
+            "gray_matter": 11.937918,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 352,
+          "weight": 6.3138655480e+00,
+          "partial_pathlength_mm": {
+            "air": 0.008868,
+            "scalp": 605.421064,
+            "skull": 68.931788,
+            "csf": 0.000000,
+            "gray_matter": 20.538172,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 295,
+          "weight": 2.8073525080e+00,
+          "partial_pathlength_mm": {
+            "air": 0.003023,
+            "scalp": 701.749631,
+            "skull": 75.005238,
+            "csf": 0.000000,
+            "gray_matter": 27.289895,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 410,
+          "weight": 1.6567884047e+00,
+          "partial_pathlength_mm": {
+            "air": 0.006453,
+            "scalp": 790.232504,
+            "skull": 112.512892,
+            "csf": 0.000000,
+            "gray_matter": 38.583203,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 674,
+          "weight": 5.0916364553e-01,
+          "partial_pathlength_mm": {
+            "air": 0.004202,
+            "scalp": 942.160171,
+            "skull": 186.673340,
+            "csf": 0.835750,
+            "gray_matter": 68.813504,
+            "white_matter": 0.172235,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "sds_mm": 38.4,
+      "angle_deg": 0.0,
+      "detected_photons": 2893,
+      "total_weight": 1.3905956160e+02,
+      "mean_pathlength_mm": 381.1118,
+      "partial_pathlength_mm": {
+        "air": 0.000747,
+        "scalp": 358.971421,
+        "skull": 17.379724,
+        "csf": 0.005937,
+        "gray_matter": 4.750972,
+        "white_matter": 0.002977,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 0,
+          "weight": 0.0000000000e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 0.000000,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 57,
+          "weight": 2.0015901983e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 181.445317,
+            "skull": 0.681255,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 214,
+          "weight": 4.3656642854e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 270.280685,
+            "skull": 5.636209,
+            "csf": 0.000000,
+            "gray_matter": 0.704070,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 309,
+          "weight": 3.4339371420e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 365.263693,
+            "skull": 13.715890,
+            "csf": 0.000000,
+            "gray_matter": 2.727414,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 319,
+          "weight": 1.9665707350e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 452.644313,
+            "skull": 24.656003,
+            "csf": 0.000000,
+            "gray_matter": 6.191043,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 328,
+          "weight": 1.0834136518e+01,
+          "partial_pathlength_mm": {
+            "air": 0.006248,
+            "scalp": 539.166063,
+            "skull": 40.709366,
+            "csf": 0.000000,
+            "gray_matter": 11.181146,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 326,
+          "weight": 5.8892297652e+00,
+          "partial_pathlength_mm": {
+            "air": 0.003530,
+            "scalp": 629.363645,
+            "skull": 49.166236,
+            "csf": 0.000000,
+            "gray_matter": 17.215617,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 259,
+          "weight": 2.4905443154e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 692.300532,
+            "skull": 81.103350,
+            "csf": 0.000000,
+            "gray_matter": 28.931134,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 429,
+          "weight": 1.7450084336e+00,
+          "partial_pathlength_mm": {
+            "air": 0.007920,
+            "scalp": 779.631774,
+            "skull": 111.892740,
+            "csf": 0.000000,
+            "gray_matter": 48.388987,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 652,
+          "weight": 4.2301896208e-01,
+          "partial_pathlength_mm": {
+            "air": 0.003670,
+            "scalp": 969.313834,
+            "skull": 173.521331,
+            "csf": 1.951788,
+            "gray_matter": 83.929173,
+            "white_matter": 0.978598,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "sds_mm": 40.1,
+      "angle_deg": 0.0,
+      "detected_photons": 1709,
+      "total_weight": 6.9134069580e+01,
+      "mean_pathlength_mm": 404.7215,
+      "partial_pathlength_mm": {
+        "air": 0.002048,
+        "scalp": 380.487035,
+        "skull": 19.530816,
+        "csf": 0.001726,
+        "gray_matter": 4.696114,
+        "white_matter": 0.003715,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 1,
+          "weight": 5.4677164555e-01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 104.226729,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 19,
+          "weight": 6.1883892417e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 193.599892,
+            "skull": 0.379175,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 98,
+          "weight": 1.9979728252e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 270.358627,
+            "skull": 5.238342,
+            "csf": 0.000000,
+            "gray_matter": 0.524579,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 162,
+          "weight": 1.8118073456e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 367.907785,
+            "skull": 12.013993,
+            "csf": 0.000000,
+            "gray_matter": 0.863067,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 201,
+          "weight": 1.2205048315e+01,
+          "partial_pathlength_mm": {
+            "air": 0.001966,
+            "scalp": 458.841676,
+            "skull": 23.289280,
+            "csf": 0.000000,
+            "gray_matter": 5.167177,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 183,
+          "weight": 6.2527155634e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 535.930364,
+            "skull": 42.033707,
+            "csf": 0.000000,
+            "gray_matter": 7.642705,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 153,
+          "weight": 2.6767087374e+00,
+          "partial_pathlength_mm": {
+            "air": 0.024464,
+            "scalp": 617.973855,
+            "skull": 60.953234,
+            "csf": 0.000000,
+            "gray_matter": 21.058516,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 177,
+          "weight": 1.7138826628e+00,
+          "partial_pathlength_mm": {
+            "air": 0.028395,
+            "scalp": 681.342972,
+            "skull": 84.115473,
+            "csf": 0.000000,
+            "gray_matter": 35.019870,
+            "white_matter": 0.006311,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 288,
+          "weight": 1.1526430624e+00,
+          "partial_pathlength_mm": {
+            "air": 0.002220,
+            "scalp": 798.037192,
+            "skull": 102.485489,
+            "csf": 0.000000,
+            "gray_matter": 43.096091,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 427,
+          "weight": 3.0010864371e-01,
+          "partial_pathlength_mm": {
+            "air": 0.002877,
+            "scalp": 963.485654,
+            "skull": 176.763922,
+            "csf": 0.397663,
+            "gray_matter": 72.067984,
+            "white_matter": 0.819649,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "sds_mm": 44.2,
+      "angle_deg": 0.0,
+      "detected_photons": 1648,
+      "total_weight": 4.6752424366e+01,
+      "mean_pathlength_mm": 444.2727,
+      "partial_pathlength_mm": {
+        "air": 0.016149,
+        "scalp": 415.705322,
+        "skull": 22.365513,
+        "csf": 0.003918,
+        "gray_matter": 6.178755,
+        "white_matter": 0.003052,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 0,
+          "weight": 0.0000000000e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 0.000000,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 10,
+          "weight": 3.3448701799e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 189.002768,
+            "skull": 0.452613,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 53,
+          "weight": 1.0940489456e+01,
+          "partial_pathlength_mm": {
+            "air": 0.053579,
+            "scalp": 266.014791,
+            "skull": 8.025057,
+            "csf": 0.000000,
+            "gray_matter": 0.909618,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 103,
+          "weight": 1.1631737851e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 367.432110,
+            "skull": 10.446393,
+            "csf": 0.000000,
+            "gray_matter": 2.378952,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 149,
+          "weight": 8.9936599955e+00,
+          "partial_pathlength_mm": {
+            "air": 0.009086,
+            "scalp": 457.411266,
+            "skull": 24.853593,
+            "csf": 0.000000,
+            "gray_matter": 5.771743,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 166,
+          "weight": 5.6274540294e+00,
+          "partial_pathlength_mm": {
+            "air": 0.013269,
+            "scalp": 553.237465,
+            "skull": 31.153832,
+            "csf": 0.000000,
+            "gray_matter": 5.822723,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 178,
+          "weight": 3.1672384720e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 629.797418,
+            "skull": 51.185652,
+            "csf": 0.000000,
+            "gray_matter": 17.353019,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 160,
+          "weight": 1.4896805896e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 707.584957,
+            "skull": 70.814658,
+            "csf": 0.000000,
+            "gray_matter": 29.331391,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 300,
+          "weight": 1.1750180384e+00,
+          "partial_pathlength_mm": {
+            "air": 0.005153,
+            "scalp": 823.056286,
+            "skull": 93.106235,
+            "csf": 0.000000,
+            "gray_matter": 36.305013,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 529,
+          "weight": 3.8227575446e-01,
+          "partial_pathlength_mm": {
+            "air": 0.016672,
+            "scalp": 983.101669,
+            "skull": 154.257340,
+            "csf": 0.479153,
+            "gray_matter": 66.072612,
+            "white_matter": 0.373206,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "sds_mm": 27.1,
+      "angle_deg": 30.0,
+      "detected_photons": 10692,
+      "total_weight": 1.3836605909e+03,
+      "mean_pathlength_mm": 250.6074,
+      "partial_pathlength_mm": {
+        "air": 0.000044,
+        "scalp": 237.063512,
+        "skull": 11.267336,
+        "csf": 0.000093,
+        "gray_matter": 2.275090,
+        "white_matter": 0.001352,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 193,
+          "weight": 1.1543627018e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 89.872347,
+            "skull": 0.065405,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 1451,
+          "weight": 5.6239906779e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 161.824820,
+            "skull": 1.683508,
+            "csf": 0.000000,
+            "gray_matter": 0.111388,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 1827,
+          "weight": 3.9605545773e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 255.951125,
+            "skull": 8.269053,
+            "csf": 0.000000,
+            "gray_matter": 0.912047,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 1519,
+          "weight": 1.7848501400e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 346.739926,
+            "skull": 20.791679,
+            "csf": 0.000000,
+            "gray_matter": 3.291896,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 1248,
+          "weight": 7.7422792662e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000579,
+            "scalp": 429.287638,
+            "skull": 41.532498,
+            "csf": 0.000000,
+            "gray_matter": 8.910474,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 918,
+          "weight": 3.0410644922e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 506.768082,
+            "skull": 61.935800,
+            "csf": 0.000000,
+            "gray_matter": 18.068997,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 731,
+          "weight": 1.3124267532e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000212,
+            "scalp": 575.835431,
+            "skull": 88.289858,
+            "csf": 0.000000,
+            "gray_matter": 26.036180,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 606,
+          "weight": 5.7865185477e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000018,
+            "scalp": 646.668112,
+            "skull": 112.110383,
+            "csf": 0.000000,
+            "gray_matter": 38.799153,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 924,
+          "weight": 3.6089421419e+00,
+          "partial_pathlength_mm": {
+            "air": 0.002964,
+            "scalp": 724.229410,
+            "skull": 150.585668,
+            "csf": 0.000000,
+            "gray_matter": 63.876481,
+            "white_matter": 0.292973,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 1275,
+          "weight": 9.3161542558e-01,
+          "partial_pathlength_mm": {
+            "air": 0.003265,
+            "scalp": 870.738244,
+            "skull": 214.483617,
+            "csf": 0.137734,
+            "gray_matter": 107.795674,
+            "white_matter": 0.873651,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "sds_mm": 30.5,
+      "angle_deg": 30.0,
+      "detected_photons": 7174,
+      "total_weight": 6.6540768556e+02,
+      "mean_pathlength_mm": 289.2391,
+      "partial_pathlength_mm": {
+        "air": 0.000135,
+        "scalp": 270.429797,
+        "skull": 15.097693,
+        "csf": 0.000994,
+        "gray_matter": 3.708766,
+        "white_matter": 0.001682,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 40,
+          "weight": 2.3044411540e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 95.810513,
+            "skull": 0.133979,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 624,
+          "weight": 2.3079187670e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 169.538801,
+            "skull": 2.210674,
+            "csf": 0.000000,
+            "gray_matter": 0.099978,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 962,
+          "weight": 2.0460185063e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 258.846806,
+            "skull": 7.545713,
+            "csf": 0.000000,
+            "gray_matter": 1.236403,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 956,
+          "weight": 1.1029192495e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 346.816841,
+            "skull": 22.759795,
+            "csf": 0.000000,
+            "gray_matter": 3.750941,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 882,
+          "weight": 5.4597084787e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000298,
+            "scalp": 434.806326,
+            "skull": 35.642197,
+            "csf": 0.000000,
+            "gray_matter": 10.208074,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 673,
+          "weight": 2.2526680676e+01,
+          "partial_pathlength_mm": {
+            "air": 0.001497,
+            "scalp": 502.913564,
+            "skull": 64.576424,
+            "csf": 0.000000,
+            "gray_matter": 17.353925,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 604,
+          "weight": 1.0727083695e+01,
+          "partial_pathlength_mm": {
+            "air": 0.002513,
+            "scalp": 571.453615,
+            "skull": 88.730758,
+            "csf": 0.000000,
+            "gray_matter": 31.245506,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 521,
+          "weight": 4.8828295548e+00,
+          "partial_pathlength_mm": {
+            "air": 0.002057,
+            "scalp": 644.884751,
+            "skull": 108.347468,
+            "csf": 0.000000,
+            "gray_matter": 46.982184,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 796,
+          "weight": 3.1415286508e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 745.705468,
+            "skull": 134.199096,
+            "csf": 0.134889,
+            "gray_matter": 59.667048,
+            "white_matter": 0.098581,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 1116,
+          "weight": 8.0241438098e-01,
+          "partial_pathlength_mm": {
+            "air": 0.003314,
+            "scalp": 883.183123,
+            "skull": 218.879362,
+            "csf": 0.295878,
+            "gray_matter": 96.977235,
+            "white_matter": 1.009020,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "sds_mm": 34.0,
+      "angle_deg": 30.0,
+      "detected_photons": 4833,
+      "total_weight": 3.3201682738e+02,
+      "mean_pathlength_mm": 332.0245,
+      "partial_pathlength_mm": {
+        "air": 0.000263,
+        "scalp": 307.281231,
+        "skull": 19.687501,
+        "csf": 0.001465,
+        "gray_matter": 5.052156,
+        "white_matter": 0.001869,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 9,
+          "weight": 5.3106597066e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 93.917070,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 215,
+          "weight": 7.8176961273e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 173.960082,
+            "skull": 1.485986,
+            "csf": 0.000000,
+            "gray_matter": 0.068321,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 513,
+          "weight": 1.0609319586e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 262.871128,
+            "skull": 9.058598,
+            "csf": 0.000000,
+            "gray_matter": 1.129371,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 651,
+          "weight": 7.3838134751e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 353.487014,
+            "skull": 20.066838,
+            "csf": 0.000000,
+            "gray_matter": 3.571032,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 616,
+          "weight": 3.7885068428e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000605,
+            "scalp": 429.932243,
+            "skull": 40.218492,
+            "csf": 0.000000,
+            "gray_matter": 10.768064,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 466,
+          "weight": 1.5450967303e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 514.775088,
+            "skull": 55.489778,
+            "csf": 0.000000,
+            "gray_matter": 17.695238,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 473,
+          "weight": 8.2752037691e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 582.393803,
+            "skull": 82.302882,
+            "csf": 0.000000,
+            "gray_matter": 29.810954,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 416,
+          "weight": 3.9973883587e+00,
+          "partial_pathlength_mm": {
+            "air": 0.012871,
+            "scalp": 643.475523,
+            "skull": 113.203092,
+            "csf": 0.000000,
+            "gray_matter": 39.605287,
+            "white_matter": 0.007996,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 582,
+          "weight": 2.3537726699e+00,
+          "partial_pathlength_mm": {
+            "air": 0.004081,
+            "scalp": 742.081623,
+            "skull": 136.986715,
+            "csf": 0.000000,
+            "gray_matter": 57.053440,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 892,
+          "weight": 6.3547526422e-01,
+          "partial_pathlength_mm": {
+            "air": 0.005358,
+            "scalp": 872.294682,
+            "skull": 221.222985,
+            "csf": 0.765317,
+            "gray_matter": 106.857090,
+            "white_matter": 0.925938,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "sds_mm": 38.2,
+      "angle_deg": 30.0,
+      "detected_photons": 3228,
+      "total_weight": 1.5896327795e+02,
+      "mean_pathlength_mm": 370.7365,
+      "partial_pathlength_mm": {
+        "air": 0.000100,
+        "scalp": 339.335187,
+        "skull": 24.854510,
+        "csf": 0.004933,
+        "gray_matter": 6.538816,
+        "white_matter": 0.002987,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 1,
+          "weight": 5.7191139460e-01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 98.094637,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 74,
+          "weight": 2.6292256773e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 179.078847,
+            "skull": 1.585789,
+            "csf": 0.000000,
+            "gray_matter": 0.221193,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 224,
+          "weight": 4.6714564547e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 263.167838,
+            "skull": 7.699845,
+            "csf": 0.000000,
+            "gray_matter": 0.877567,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 352,
+          "weight": 4.0036127552e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 354.816653,
+            "skull": 18.937840,
+            "csf": 0.000000,
+            "gray_matter": 3.325305,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 379,
+          "weight": 2.3542410273e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 425.845102,
+            "skull": 42.958009,
+            "csf": 0.000000,
+            "gray_matter": 10.984501,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 324,
+          "weight": 1.0738403147e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 515.099629,
+            "skull": 56.774925,
+            "csf": 0.000000,
+            "gray_matter": 15.839110,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 343,
+          "weight": 5.9840939371e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000453,
+            "scalp": 588.100911,
+            "skull": 81.418740,
+            "csf": 0.000000,
+            "gray_matter": 27.087041,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 268,
+          "weight": 2.5571871828e+00,
+          "partial_pathlength_mm": {
+            "air": 0.003570,
+            "scalp": 653.701811,
+            "skull": 107.320932,
+            "csf": 0.000000,
+            "gray_matter": 37.181632,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 506,
+          "weight": 2.0023732474e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000703,
+            "scalp": 734.742705,
+            "skull": 146.147061,
+            "csf": 0.000000,
+            "gray_matter": 57.576997,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 757,
+          "weight": 5.2394989895e-01,
+          "partial_pathlength_mm": {
+            "air": 0.005061,
+            "scalp": 876.426823,
+            "skull": 221.514574,
+            "csf": 1.496786,
+            "gray_matter": 111.342088,
+            "white_matter": 0.906298,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "sds_mm": 37.6,
+      "angle_deg": -30.0,
+      "detected_photons": 3696,
+      "total_weight": 1.8945969703e+02,
+      "mean_pathlength_mm": 371.1516,
+      "partial_pathlength_mm": {
+        "air": 0.321769,
+        "scalp": 339.099843,
+        "skull": 27.744535,
+        "csf": 0.002592,
+        "gray_matter": 3.977312,
+        "white_matter": 0.005603,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 1,
+          "weight": 5.9494668245e-01,
+          "partial_pathlength_mm": {
+            "air": 0.344214,
+            "scalp": 88.953139,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 77,
+          "weight": 2.8301279008e+01,
+          "partial_pathlength_mm": {
+            "air": 0.335855,
+            "scalp": 168.686147,
+            "skull": 6.248041,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 280,
+          "weight": 5.8805039242e+01,
+          "partial_pathlength_mm": {
+            "air": 0.321300,
+            "scalp": 256.998336,
+            "skull": 14.131152,
+            "csf": 0.000000,
+            "gray_matter": 0.475766,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 391,
+          "weight": 4.6045403399e+01,
+          "partial_pathlength_mm": {
+            "air": 0.329494,
+            "scalp": 342.705540,
+            "skull": 26.346461,
+            "csf": 0.000000,
+            "gray_matter": 1.841844,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 473,
+          "weight": 2.9259737883e+01,
+          "partial_pathlength_mm": {
+            "air": 0.291528,
+            "scalp": 438.787611,
+            "skull": 38.975305,
+            "csf": 0.000000,
+            "gray_matter": 5.045044,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 414,
+          "weight": 1.3794876495e+01,
+          "partial_pathlength_mm": {
+            "air": 0.334840,
+            "scalp": 524.026894,
+            "skull": 53.136829,
+            "csf": 0.000000,
+            "gray_matter": 11.380951,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 385,
+          "weight": 6.8667615512e+00,
+          "partial_pathlength_mm": {
+            "air": 0.313390,
+            "scalp": 603.911776,
+            "skull": 73.090969,
+            "csf": 0.000000,
+            "gray_matter": 18.926816,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 339,
+          "weight": 3.2264143787e+00,
+          "partial_pathlength_mm": {
+            "air": 0.325777,
+            "scalp": 681.382287,
+            "skull": 95.720424,
+            "csf": 0.000000,
+            "gray_matter": 26.327500,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 505,
+          "weight": 1.9530840690e+00,
+          "partial_pathlength_mm": {
+            "air": 0.323271,
+            "scalp": 787.908505,
+            "skull": 121.119377,
+            "csf": 0.000000,
+            "gray_matter": 38.946585,
+            "white_matter": 0.321894,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 831,
+          "weight": 6.1215432631e-01,
+          "partial_pathlength_mm": {
+            "air": 0.331634,
+            "scalp": 937.830954,
+            "skull": 187.560205,
+            "csf": 0.802280,
+            "gray_matter": 73.778102,
+            "white_matter": 0.707148,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "sds_mm": 39.5,
+      "angle_deg": -30.0,
+      "detected_photons": 2840,
+      "total_weight": 1.2135096939e+02,
+      "mean_pathlength_mm": 395.9286,
+      "partial_pathlength_mm": {
+        "air": 0.259002,
+        "scalp": 361.359649,
+        "skull": 29.912387,
+        "csf": 0.007495,
+        "gray_matter": 4.380373,
+        "white_matter": 0.009714,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 0,
+          "weight": 0.0000000000e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 0.000000,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 45,
+          "weight": 1.5437782824e+01,
+          "partial_pathlength_mm": {
+            "air": 0.283310,
+            "scalp": 177.501361,
+            "skull": 7.976803,
+            "csf": 0.000000,
+            "gray_matter": 0.072320,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 156,
+          "weight": 3.1634301215e+01,
+          "partial_pathlength_mm": {
+            "air": 0.261350,
+            "scalp": 261.633275,
+            "skull": 14.691708,
+            "csf": 0.000000,
+            "gray_matter": 0.270236,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 295,
+          "weight": 3.3566691861e+01,
+          "partial_pathlength_mm": {
+            "air": 0.261065,
+            "scalp": 353.084466,
+            "skull": 23.230232,
+            "csf": 0.000000,
+            "gray_matter": 1.375302,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 333,
+          "weight": 2.0974745952e+01,
+          "partial_pathlength_mm": {
+            "air": 0.258681,
+            "scalp": 434.197001,
+            "skull": 39.783442,
+            "csf": 0.000000,
+            "gray_matter": 4.990129,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 285,
+          "weight": 9.4297984075e+00,
+          "partial_pathlength_mm": {
+            "air": 0.235824,
+            "scalp": 520.499560,
+            "skull": 57.326591,
+            "csf": 0.000000,
+            "gray_matter": 11.495082,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 307,
+          "weight": 5.6252137143e+00,
+          "partial_pathlength_mm": {
+            "air": 0.226666,
+            "scalp": 617.968633,
+            "skull": 63.372010,
+            "csf": 0.000000,
+            "gray_matter": 12.796509,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 243,
+          "weight": 2.3679189654e+00,
+          "partial_pathlength_mm": {
+            "air": 0.239300,
+            "scalp": 676.095305,
+            "skull": 93.124739,
+            "csf": 0.000000,
+            "gray_matter": 30.430527,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 449,
+          "weight": 1.7915418198e+00,
+          "partial_pathlength_mm": {
+            "air": 0.228105,
+            "scalp": 784.043169,
+            "skull": 118.202045,
+            "csf": 0.000000,
+            "gray_matter": 41.022597,
+            "white_matter": 0.103027,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 727,
+          "weight": 5.2297463305e-01,
+          "partial_pathlength_mm": {
+            "air": 0.240568,
+            "scalp": 928.313800,
+            "skull": 188.243270,
+            "csf": 1.739140,
+            "gray_matter": 86.306528,
+            "white_matter": 1.901067,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "sds_mm": 42.6,
+      "angle_deg": -30.0,
+      "detected_photons": 1616,
+      "total_weight": 5.2483120163e+01,
+      "mean_pathlength_mm": 435.7940,
+      "partial_pathlength_mm": {
+        "air": 0.490517,
+        "scalp": 393.324912,
+        "skull": 34.813986,
+        "csf": 0.005914,
+        "gray_matter": 7.146317,
+        "white_matter": 0.012342,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 0,
+          "weight": 0.0000000000e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 0.000000,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 5,
+          "weight": 1.6419503689e+00,
+          "partial_pathlength_mm": {
+            "air": 0.358756,
+            "scalp": 193.668014,
+            "skull": 1.063769,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 66,
+          "weight": 1.3711918980e+01,
+          "partial_pathlength_mm": {
+            "air": 0.474633,
+            "scalp": 258.817829,
+            "skull": 14.625931,
+            "csf": 0.000000,
+            "gray_matter": 0.428984,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 145,
+          "weight": 1.6353114821e+01,
+          "partial_pathlength_mm": {
+            "air": 0.500778,
+            "scalp": 351.861701,
+            "skull": 25.835085,
+            "csf": 0.000000,
+            "gray_matter": 1.903861,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 150,
+          "weight": 9.2247560248e+00,
+          "partial_pathlength_mm": {
+            "air": 0.520642,
+            "scalp": 437.515026,
+            "skull": 40.780742,
+            "csf": 0.000000,
+            "gray_matter": 5.721220,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 158,
+          "weight": 5.2441728264e+00,
+          "partial_pathlength_mm": {
+            "air": 0.503361,
+            "scalp": 521.003886,
+            "skull": 56.013157,
+            "csf": 0.000000,
+            "gray_matter": 12.751082,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 191,
+          "weight": 3.3517644368e+00,
+          "partial_pathlength_mm": {
+            "air": 0.481575,
+            "scalp": 602.760961,
+            "skull": 66.870592,
+            "csf": 0.000000,
+            "gray_matter": 27.748845,
+            "white_matter": 0.000472,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 160,
+          "weight": 1.5241599865e+00,
+          "partial_pathlength_mm": {
+            "air": 0.462367,
+            "scalp": 699.913565,
+            "skull": 79.869597,
+            "csf": 0.000000,
+            "gray_matter": 23.976324,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 288,
+          "weight": 1.1159935262e+00,
+          "partial_pathlength_mm": {
+            "air": 0.500280,
+            "scalp": 782.714322,
+            "skull": 114.544575,
+            "csf": 0.000000,
+            "gray_matter": 51.223294,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 453,
+          "weight": 3.1528919202e-01,
+          "partial_pathlength_mm": {
+            "air": 0.436839,
+            "scalp": 929.941581,
+            "skull": 186.278648,
+            "csf": 0.984454,
+            "gray_matter": 100.488221,
+            "white_matter": 2.049381,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "sds_mm": 45.3,
+      "angle_deg": -30.0,
+      "detected_photons": 1552,
+      "total_weight": 4.0015978473e+01,
+      "mean_pathlength_mm": 471.0798,
+      "partial_pathlength_mm": {
+        "air": 0.234915,
+        "scalp": 425.112666,
+        "skull": 35.137160,
+        "csf": 0.021664,
+        "gray_matter": 10.553370,
+        "white_matter": 0.020047,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 0,
+          "weight": 0.0000000000e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 0.000000,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 2,
+          "weight": 7.3618870974e-01,
+          "partial_pathlength_mm": {
+            "air": 0.073233,
+            "scalp": 177.509934,
+            "skull": 0.934035,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 34,
+          "weight": 7.0811203271e+00,
+          "partial_pathlength_mm": {
+            "air": 0.169007,
+            "scalp": 250.925623,
+            "skull": 19.118992,
+            "csf": 0.000000,
+            "gray_matter": 1.402829,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 96,
+          "weight": 1.0966869682e+01,
+          "partial_pathlength_mm": {
+            "air": 0.230709,
+            "scalp": 354.887698,
+            "skull": 21.158473,
+            "csf": 0.000000,
+            "gray_matter": 1.544627,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 173,
+          "weight": 1.0561967660e+01,
+          "partial_pathlength_mm": {
+            "air": 0.292262,
+            "scalp": 449.456977,
+            "skull": 31.266381,
+            "csf": 0.000000,
+            "gray_matter": 5.735920,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 149,
+          "weight": 4.9825513568e+00,
+          "partial_pathlength_mm": {
+            "air": 0.227815,
+            "scalp": 514.154665,
+            "skull": 49.627186,
+            "csf": 0.000000,
+            "gray_matter": 22.809819,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 157,
+          "weight": 2.7478539022e+00,
+          "partial_pathlength_mm": {
+            "air": 0.239156,
+            "scalp": 619.309514,
+            "skull": 56.840642,
+            "csf": 0.000000,
+            "gray_matter": 24.104830,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 152,
+          "weight": 1.4566287356e+00,
+          "partial_pathlength_mm": {
+            "air": 0.242526,
+            "scalp": 676.834468,
+            "skull": 85.142290,
+            "csf": 0.000000,
+            "gray_matter": 39.894433,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 284,
+          "weight": 1.1353161226e+00,
+          "partial_pathlength_mm": {
+            "air": 0.266528,
+            "scalp": 780.178957,
+            "skull": 107.292029,
+            "csf": 0.188779,
+            "gray_matter": 54.890189,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 505,
+          "weight": 3.4748197717e-01,
+          "partial_pathlength_mm": {
+            "air": 0.243266,
+            "scalp": 947.981223,
+            "skull": 168.091480,
+            "csf": 1.877979,
+            "gray_matter": 99.374205,
+            "white_matter": 2.308611,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "sds_mm": 27.1,
+      "angle_deg": 60.0,
+      "detected_photons": 10933,
+      "total_weight": 1.4577763286e+03,
+      "mean_pathlength_mm": 244.8738,
+      "partial_pathlength_mm": {
+        "air": 0.000010,
+        "scalp": 225.210291,
+        "skull": 15.923670,
+        "csf": 0.000856,
+        "gray_matter": 3.737050,
+        "white_matter": 0.001906,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 225,
+          "weight": 1.3529620630e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 88.759622,
+            "skull": 0.166968,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 1584,
+          "weight": 6.1628796139e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 160.554420,
+            "skull": 2.545474,
+            "csf": 0.000000,
+            "gray_matter": 0.128546,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 1818,
+          "weight": 3.9317431879e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 249.134550,
+            "skull": 13.817921,
+            "csf": 0.000000,
+            "gray_matter": 1.956792,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 1567,
+          "weight": 1.8318580965e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 329.377218,
+            "skull": 33.626849,
+            "csf": 0.000000,
+            "gray_matter": 7.068664,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 1170,
+          "weight": 7.3127416585e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 403.861217,
+            "skull": 57.228181,
+            "csf": 0.000000,
+            "gray_matter": 15.328356,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 983,
+          "weight": 3.2784202907e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000317,
+            "scalp": 476.303816,
+            "skull": 80.238238,
+            "csf": 0.000000,
+            "gray_matter": 26.362376,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 751,
+          "weight": 1.3305487796e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 533.561007,
+            "skull": 113.012417,
+            "csf": 0.000000,
+            "gray_matter": 41.956345,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 628,
+          "weight": 5.9878130662e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 597.939937,
+            "skull": 139.817196,
+            "csf": 0.000000,
+            "gray_matter": 54.784821,
+            "white_matter": 0.008947,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 928,
+          "weight": 3.7414337142e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000177,
+            "scalp": 675.346393,
+            "skull": 172.551462,
+            "csf": 0.175720,
+            "gray_matter": 81.195416,
+            "white_matter": 0.315226,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 1279,
+          "weight": 8.8567838333e-01,
+          "partial_pathlength_mm": {
+            "air": 0.003769,
+            "scalp": 795.008542,
+            "skull": 256.336233,
+            "csf": 0.666101,
+            "gray_matter": 145.709825,
+            "white_matter": 1.744560,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "sds_mm": 32.8,
+      "angle_deg": 60.0,
+      "detected_photons": 5649,
+      "total_weight": 4.4020668015e+02,
+      "mean_pathlength_mm": 310.7148,
+      "partial_pathlength_mm": {
+        "air": 0.000048,
+        "scalp": 271.137325,
+        "skull": 31.048412,
+        "csf": 0.002814,
+        "gray_matter": 8.520336,
+        "white_matter": 0.005835,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 11,
+          "weight": 6.4748764634e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 94.400068,
+            "skull": 0.305687,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 348,
+          "weight": 1.2991679788e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 164.165171,
+            "skull": 5.595513,
+            "csf": 0.000000,
+            "gray_matter": 0.271967,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 645,
+          "weight": 1.3630705540e+02,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 247.877171,
+            "skull": 17.830504,
+            "csf": 0.000000,
+            "gray_matter": 2.388598,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 763,
+          "weight": 8.7751917101e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 326.866028,
+            "skull": 37.164072,
+            "csf": 0.000000,
+            "gray_matter": 8.074016,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 699,
+          "weight": 4.3513243139e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000185,
+            "scalp": 389.097299,
+            "skull": 66.568181,
+            "csf": 0.020045,
+            "gray_matter": 20.014903,
+            "white_matter": 0.000189,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 600,
+          "weight": 1.9810868341e+01,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 446.227425,
+            "skull": 98.111987,
+            "csf": 0.000000,
+            "gray_matter": 36.729691,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 534,
+          "weight": 9.2833673442e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 520.418278,
+            "skull": 118.849314,
+            "csf": 0.003073,
+            "gray_matter": 49.909683,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 420,
+          "weight": 3.9382285220e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 568.793493,
+            "skull": 153.573481,
+            "csf": 0.000000,
+            "gray_matter": 69.234800,
+            "white_matter": 0.148132,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 643,
+          "weight": 2.5378923104e+00,
+          "partial_pathlength_mm": {
+            "air": 0.003233,
+            "scalp": 630.515333,
+            "skull": 201.574673,
+            "csf": 0.000000,
+            "gray_matter": 94.636651,
+            "white_matter": 0.303958,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 986,
+          "weight": 6.7243365553e-01,
+          "partial_pathlength_mm": {
+            "air": 0.007011,
+            "scalp": 750.112166,
+            "skull": 278.333220,
+            "csf": 0.502795,
+            "gray_matter": 158.457238,
+            "white_matter": 1.792682,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "sds_mm": 37.3,
+      "angle_deg": -60.0,
+      "detected_photons": 3176,
+      "total_weight": 1.6654151471e+02,
+      "mean_pathlength_mm": 363.6205,
+      "partial_pathlength_mm": {
+        "air": 0.457722,
+        "scalp": 319.523646,
+        "skull": 38.955304,
+        "csf": 0.004417,
+        "gray_matter": 4.669267,
+        "white_matter": 0.010116,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 1,
+          "weight": 5.8890479803e-01,
+          "partial_pathlength_mm": {
+            "air": 0.209547,
+            "scalp": 95.274841,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 69,
+          "weight": 2.5767137915e+01,
+          "partial_pathlength_mm": {
+            "air": 0.353419,
+            "scalp": 160.952962,
+            "skull": 10.501473,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 258,
+          "weight": 5.4804800570e+01,
+          "partial_pathlength_mm": {
+            "air": 0.498154,
+            "scalp": 240.820543,
+            "skull": 26.083209,
+            "csf": 0.000000,
+            "gray_matter": 0.882920,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 337,
+          "weight": 3.8753691494e+01,
+          "partial_pathlength_mm": {
+            "air": 0.467602,
+            "scalp": 334.507436,
+            "skull": 37.687118,
+            "csf": 0.000000,
+            "gray_matter": 1.762677,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 387,
+          "weight": 2.4159056950e+01,
+          "partial_pathlength_mm": {
+            "air": 0.452962,
+            "scalp": 422.486299,
+            "skull": 50.468418,
+            "csf": 0.000000,
+            "gray_matter": 5.979359,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 354,
+          "weight": 1.1925527276e+01,
+          "partial_pathlength_mm": {
+            "air": 0.467549,
+            "scalp": 496.820308,
+            "skull": 71.981754,
+            "csf": 0.000000,
+            "gray_matter": 15.392692,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 302,
+          "weight": 5.4871058799e+00,
+          "partial_pathlength_mm": {
+            "air": 0.484453,
+            "scalp": 575.707415,
+            "skull": 92.246846,
+            "csf": 0.000000,
+            "gray_matter": 22.038011,
+            "white_matter": 0.003969,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 269,
+          "weight": 2.5526172589e+00,
+          "partial_pathlength_mm": {
+            "air": 0.481699,
+            "scalp": 646.533383,
+            "skull": 125.991283,
+            "csf": 0.000000,
+            "gray_matter": 27.735986,
+            "white_matter": 0.131285,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 489,
+          "weight": 1.9849583212e+00,
+          "partial_pathlength_mm": {
+            "air": 0.469123,
+            "scalp": 731.345970,
+            "skull": 155.493130,
+            "csf": 0.000000,
+            "gray_matter": 46.648837,
+            "white_matter": 0.215956,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 710,
+          "weight": 5.1771424890e-01,
+          "partial_pathlength_mm": {
+            "air": 0.462214,
+            "scalp": 881.376946,
+            "skull": 218.208114,
+            "csf": 1.421001,
+            "gray_matter": 93.847886,
+            "white_matter": 1.736943,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "sds_mm": 42.5,
+      "angle_deg": -60.0,
+      "detected_photons": 2225,
+      "total_weight": 6.8344985250e+01,
+      "mean_pathlength_mm": 434.9202,
+      "partial_pathlength_mm": {
+        "air": 0.165569,
+        "scalp": 369.551960,
+        "skull": 52.218845,
+        "csf": 0.039852,
+        "gray_matter": 12.908750,
+        "white_matter": 0.035252,
+        "amygdala": 0.000000
+      },
+      "time_gates": [
+        {
+          "gate": 0,
+          "range_ps": [0, 500],
+          "detected_photons": 0,
+          "weight": 0.0000000000e+00,
+          "partial_pathlength_mm": {
+            "air": 0.000000,
+            "scalp": 0.000000,
+            "skull": 0.000000,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 1,
+          "range_ps": [500, 1000],
+          "detected_photons": 13,
+          "weight": 4.8419627547e+00,
+          "partial_pathlength_mm": {
+            "air": 0.121108,
+            "scalp": 162.981138,
+            "skull": 8.827191,
+            "csf": 0.000000,
+            "gray_matter": 0.000000,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 2,
+          "range_ps": [1000, 1500],
+          "detected_photons": 77,
+          "weight": 1.5535568878e+01,
+          "partial_pathlength_mm": {
+            "air": 0.193686,
+            "scalp": 246.434993,
+            "skull": 26.271638,
+            "csf": 0.000000,
+            "gray_matter": 2.686878,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 3,
+          "range_ps": [1500, 2000],
+          "detected_photons": 157,
+          "weight": 1.7661258109e+01,
+          "partial_pathlength_mm": {
+            "air": 0.135574,
+            "scalp": 330.642439,
+            "skull": 39.533635,
+            "csf": 0.000000,
+            "gray_matter": 6.642142,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 4,
+          "range_ps": [2000, 2500],
+          "detected_photons": 241,
+          "weight": 1.4617257036e+01,
+          "partial_pathlength_mm": {
+            "air": 0.202409,
+            "scalp": 408.498663,
+            "skull": 60.921632,
+            "csf": 0.000000,
+            "gray_matter": 12.402099,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 5,
+          "range_ps": [2500, 3000],
+          "detected_photons": 226,
+          "weight": 7.3923890442e+00,
+          "partial_pathlength_mm": {
+            "air": 0.169678,
+            "scalp": 482.203700,
+            "skull": 81.538490,
+            "csf": 0.000000,
+            "gray_matter": 22.587794,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 6,
+          "range_ps": [3000, 3500],
+          "detected_photons": 234,
+          "weight": 4.2100254390e+00,
+          "partial_pathlength_mm": {
+            "air": 0.112030,
+            "scalp": 574.369995,
+            "skull": 91.077336,
+            "csf": 0.000000,
+            "gray_matter": 24.289285,
+            "white_matter": 0.000000,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 7,
+          "range_ps": [3500, 4000],
+          "detected_photons": 218,
+          "weight": 2.0687592858e+00,
+          "partial_pathlength_mm": {
+            "air": 0.152248,
+            "scalp": 640.359425,
+            "skull": 104.557121,
+            "csf": 0.322725,
+            "gray_matter": 54.142869,
+            "white_matter": 0.205896,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 8,
+          "range_ps": [4000, 5000],
+          "detected_photons": 385,
+          "weight": 1.5568226811e+00,
+          "partial_pathlength_mm": {
+            "air": 0.172968,
+            "scalp": 721.514190,
+            "skull": 147.921342,
+            "csf": 0.751617,
+            "gray_matter": 64.723262,
+            "white_matter": 0.133311,
+            "amygdala": 0.000000
+          }
+        },
+        {
+          "gate": 9,
+          "range_ps": [5000, 100000],
+          "detected_photons": 674,
+          "weight": 4.6094202195e-01,
+          "partial_pathlength_mm": {
+            "air": 0.123826,
+            "scalp": 863.246623,
+            "skull": 209.346380,
+            "csf": 1.921968,
+            "gray_matter": 129.963043,
+            "white_matter": 3.852552,
+            "amygdala": 0.000000
+          }
+        }
+      ]
+    }
+  ]
+}
