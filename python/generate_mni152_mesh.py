@@ -364,7 +364,11 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
         nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
         elems = np.asarray(mesh['elem'], dtype=np.int64)
     
-    print(f"    Raw mesh: {len(nodes)} nodes, elems shape {elems.shape}")
+    # Ensure nodes is (N, 3) - cgalv2m may return (N, 4) with homogeneous coord
+    if nodes.ndim == 2 and nodes.shape[1] == 4:
+        nodes = nodes[:, :3]
+    
+    print(f"    Raw mesh: {len(nodes)} nodes shape {nodes.shape}, elems shape {elems.shape}")
     
     # cgalv2m returns elements with format [n1, n2, n3, n4, region_id] (1-indexed)
     # Extract just the first 4 columns and convert to 0-indexed
@@ -408,16 +412,13 @@ def assign_tissue_labels_to_mesh(nodes_mm, elems, labels_vol, affine):
         tissue_labels: (M,) int32 tissue type per element
     """
     print("    Computing centroids and sampling labels...")
-    print(f"    nodes_mm shape: {nodes_mm.shape}, elems shape: {elems.shape}")
     inv_aff = np.linalg.inv(affine)
     
     # Compute centroids
     centroids = nodes_mm[elems[:, :4]].mean(axis=1)
-    print(f"    centroids shape: {centroids.shape}")
     
     # Transform to voxel space
     cents_hom = np.hstack([centroids, np.ones((len(centroids), 1))])
-    print(f"    cents_hom shape: {cents_hom.shape}, inv_aff shape: {inv_aff.shape}")
     vox_coords = (inv_aff @ cents_hom.T).T[:, :3]
     
     # Round to nearest voxel
