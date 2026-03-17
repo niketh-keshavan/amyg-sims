@@ -334,7 +334,7 @@ def generate_interior_refinement_points(brain_mask, affine, spacing=8.0):
     vk = np.clip(vk, 0, shape[2]-1)
     
     # Keep only points inside brain mask
-    inside = brain_mask[vi, vj, vk]
+    inside = brain_mask[vi, vj, vk].astype(bool)
     interior_pts = grid_pts[inside, :3]  # (N, 3) in MNI mm
     
     print(f"    Generated {len(interior_pts):,} interior refinement points")
