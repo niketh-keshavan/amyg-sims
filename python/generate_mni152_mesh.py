@@ -356,8 +356,13 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     # Mesh the brain volume - cgalv2m(vol, opt, maxvol)
     mesh = iso2mesh.cgalv2m(brain_mask, opt, max_vol)
     
-    nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
-    elems = np.asarray(mesh['elem'], dtype=np.int64)
+    # cgalv2m returns either a dict or a tuple (node, elem, face)
+    if isinstance(mesh, tuple):
+        nodes = np.asarray(mesh[0], dtype=np.float64) * voxel_size  # Scale to mm
+        elems = np.asarray(mesh[1], dtype=np.int64)
+    else:
+        nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
+        elems = np.asarray(mesh['elem'], dtype=np.int64)
     
     # cgalv2m returns a single region - we need to relabel based on centroid positions
     print("  Assigning tissue labels based on centroid positions...")
