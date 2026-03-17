@@ -367,6 +367,11 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     # Convert from 1-indexed (MATLAB) to 0-indexed (Python)
     elems = elems - 1
     
+    # cgalv2m returns elements with 5 columns: [n1, n2, n3, n4, region_id]
+    # Extract just the first 4 columns for tetrahedra
+    if elems.shape[1] == 5:
+        elems = elems[:, :4]
+    
     # cgalv2m returns a single region - we need to relabel based on centroid positions
     print("  Assigning tissue labels based on centroid positions...")
     # Build affine: voxel to mm transform (isotropic voxels)
