@@ -1,6 +1,7 @@
 # MMC (Mesh-Based Monte Carlo) with MNI152 head model
-set(ROOT_SRC ${CMAKE_SOURCE_DIR}/src)
-set(ROOT_INC ${CMAKE_SOURCE_DIR}/include)
+set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(ROOT_SRC ${ROOT_DIR}/src)
+set(ROOT_INC ${ROOT_DIR}/include)
 
 add_executable(mmc_fnirs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mmc_main.cu

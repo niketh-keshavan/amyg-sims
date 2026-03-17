@@ -1,0 +1,42 @@
+# Large binary data files
+*.bin
+
+# Archives
+*.tar.gz
+*.tar
+*.zip
+*.gz
+
+# Large HTML viewers
+tools/viewer.html
+**/viewer.html
+
+# Results directories with large outputs
+results_10b_pulled/
+results_1b_pulled/
+results_*/
+
+# Build artifacts
+build/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.lib
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.cache
