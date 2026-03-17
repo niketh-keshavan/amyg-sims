@@ -364,6 +364,9 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
         nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
         elems = np.asarray(mesh['elem'], dtype=np.int64)
     
+    # Convert from 1-indexed (MATLAB) to 0-indexed (Python)
+    elems = elems - 1
+    
     # cgalv2m returns a single region - we need to relabel based on centroid positions
     print("  Assigning tissue labels based on centroid positions...")
     # Build affine: voxel to mm transform (isotropic voxels)
