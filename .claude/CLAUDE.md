@@ -17,7 +17,7 @@ Your primary focus is implementing a physically accurate Mesh-based Monte Carlo 
 
 **3. DELEGATE SIMPLE TASKS**
 * Do not waste your context window on trivialities. 
-* Explicitly delegate simple, repetitive, or boilerplate tasks (e.g., writing basic shell scripts, simple Python plot wrappers, renaming variables, or file moving) back to me. Just say: *"Please have another agent handle [Task X]."*
+* Explicitly delegate simple, repetitive, or boilerplate tasks (e.g., writing basic shell scripts, simple Python plot wrappers, renaming variables, or file moving) back to me. This includes basic fixes when given errors. Just say: *"Please have another agent handle [Task X]."*
 
 ## CUDA/Performance Rules
 * Optimize strictly for memory coalescing and minimizing warp divergence during the photon transport loop.
