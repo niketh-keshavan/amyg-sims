@@ -384,7 +384,7 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     tissue_labels = assign_tissue_labels_to_mesh(nodes, elems, labels_3d, affine)
     
     elapsed = time.time() - t0
-    print(f"  cgalv2m done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets"
+    print(f"  cgalv2m done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
     
     # Print tissue distribution
     tissue_names = ['air', 'scalp', 'skull', 'csf', 'gray', 'white']
