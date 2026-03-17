@@ -172,22 +172,23 @@ static void find_source_on_scalp(const HostMesh& mesh,
     printf("  Right amygdala centroid: (%.1f, %.1f, %.1f) mm [%d vertices]\n",
            amyg_cx, amyg_cy, amyg_cz, amyg_count);
 
-    // Pure lateral projection along +x from right amygdala onto temporal scalp.
-    // The temporal bone directly overlying the amygdala is at the same y,z
-    // but further lateral — this is the standard fNIRS optode placement.
-    // Previous approaches (radial, ellipsoidal) all landed on the inferior
-    // surface because the amygdala z=-20 is below any head center estimate.
-    float proj_dx = 1.0f;
-    float proj_dy = 0.0f;
-    float proj_dz = 0.0f;
+    // Ellipsoidal projection matching voxel MC (src/detector.cu:32-42)
+    // Head semi-axes: (78, 95, 85) mm
+    // Source is placed inferior to amygdala so photons travel UP through it.
+    float ea = amyg_cx / 78.0f;
+    float eb = amyg_cy / 95.0f;
+    float ec = amyg_cz / 85.0f;
+    float t_scalp = 1.0f / sqrtf(ea*ea + eb*eb + ec*ec);
 
-    printf("  Projection: pure lateral +x from (%.1f, %.1f, %.1f)\n",
-           amyg_cx, amyg_cy, amyg_cz);
+    float target_x = t_scalp * amyg_cx;   // ~76mm lateral
+    float target_y = t_scalp * amyg_cy;   // ~-6mm posterior  
+    float target_z = t_scalp * amyg_cz;   // ~-57mm inferior (BELOW amygdala)
 
-    // Find scalp boundary face closest to the lateral ray from amygdala.
-    // Constrain to faces with z > amygdala_z - 20mm to prevent inferior surface.
+    printf("  Ellipsoidal target: (%.1f, %.1f, %.1f) mm\n",
+           target_x, target_y, target_z);
+
+    // Find nearest scalp boundary face to ellipsoidal target point
     static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
-    float z_min_constraint = amyg_cz - 20.0f;
     float best_score = 1e30f;
     float best_x = 0, best_y = 0, best_z = 0;
     float best_nx = 0, best_ny = 0, best_nz = 0;
@@ -206,22 +207,13 @@ static void find_source_on_scalp(const HostMesh& mesh,
             }
             fx /= 3.0f; fy /= 3.0f; fz /= 3.0f;
 
-            if (fz < z_min_constraint) continue;
+            float dx = fx - target_x;
+            float dy = fy - target_y;
+            float dz = fz - target_z;
+            float dist2 = dx*dx + dy*dy + dz*dz;
 
-            float vx = fx - amyg_cx;
-            float vy = fy - amyg_cy;
-            float vz = fz - amyg_cz;
-
-            float t = vx * proj_dx + vy * proj_dy + vz * proj_dz;
-            if (t <= 0.0f) continue;
-
-            float perp_x = vx - t * proj_dx;
-            float perp_y = vy - t * proj_dy;
-            float perp_z = vz - t * proj_dz;
-            float perp_dist2 = perp_x*perp_x + perp_y*perp_y + perp_z*perp_z;
-
-            if (perp_dist2 < best_score) {
-                best_score = perp_dist2;
+            if (dist2 < best_score) {
+                best_score = dist2;
                 best_x = fx; best_y = fy; best_z = fz;
 
                 int va = mesh.elements[e * 4 + FV[f][0]];
