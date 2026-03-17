@@ -291,7 +291,7 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
 # Step 4: Tetrahedral meshing with TetGen
 # ---------------------------------------------------------------------------
 
-def mesh_with_brain2mesh(labels_vol, max_vol=5.0):
+def mesh_with_brain2mesh(labels_vol, max_vol=1.0):
     """
     Generate multi-tissue brain mesh using cgalv2m from iso2mesh.
 
@@ -712,7 +712,7 @@ def load_checkpoint(checkpoint_dir, step_name):
         return data
     return None
 
-def generate_mni152_mesh(output_path, max_vol=5.0, min_dihedral=15.0, 
+def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0, 
                          checkpoint_dir=None, resume=True):
     """
     Generate MNI152 head mesh with checkpoint/resume support.
@@ -954,7 +954,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--output',   default='mni152_head.mmcmesh',
                    help='Output .mmcmesh file path (default: mni152_head.mmcmesh)')
-    p.add_argument('--max-vol',  type=float, default=5.0,
+    p.add_argument('--max-vol',  type=float, default=1.0,
                    help='Max tet volume mm³ — smaller = denser mesh (default: 50)')
     p.add_argument('--min-dihedral', type=float, default=15.0,
                    help='Min dihedral angle in degrees (default: 15)')
