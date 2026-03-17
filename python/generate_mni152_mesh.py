@@ -340,42 +340,51 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
     
     # Use vol2mesh to create mesh from labeled volume
     # This uses CGAL's mesh generation directly
-    print("  Running vol2mesh (CGAL mesh generation)...")
-    # Find boundary voxels for surface seed points
-    # Create simple seed points at tissue boundaries
-    x_idx, y_idx, z_idx = np.where(labels_3d > 0)
-    # Subsample to avoid too many seed points
-    n_seeds = min(len(x_idx), 10000)
+    print("  Running cgalv2m (CGAL volume meshing)...")
+    # Use cgalv2m which meshes a binary volume directly
+    # Create a binary mask of all brain tissues
+    brain_mask = (labels_3d > 0).astype(np.uint8)
+    
+    # Create simple seed points on the surface
+    # Find surface voxels (brain voxels adjacent to background)
+    from scipy import ndimage
+    eroded = ndimage.binary_erosion(brain_mask)
+    surface = brain_mask & ~eroded
+    x_idx, y_idx, z_idx = np.where(surface)
+    
+    # Limit seed points
+    n_seeds = min(len(x_idx), 5000)
     if len(x_idx) > n_seeds:
-        indices = np.random.choice(len(x_idx), n_seeds, replace=False)
+        step = len(x_idx) // n_seeds
+        indices = np.arange(0, len(x_idx), step)[:n_seeds]
         x_idx, y_idx, z_idx = x_idx[indices], y_idx[indices], z_idx[indices]
     
-    # Create option structure with default settings
-    opt = iso2mesh.core.optset()
-    opt['maxvol'] = max_vol
-    opt['radbound'] = 3.0  # Surface sampling density
+    print(f"    Using {len(x_idx)} surface seed points")
     
-    mesh = iso2mesh.vol2mesh(
-        labels_3d,
-        x_idx, y_idx, z_idx,
-        opt,
-        maxvol=max_vol,
-        dofix=1,
-        method='cgalmesh',
+    # Create options as a simple dictionary
+    opt = {
+        'maxvol': max_vol,
+        'radbound': 3.0,
+    }
+    
+    # Mesh the brain volume
+    mesh = iso2mesh.cgalv2m(
+        brain_mask,
+        x_idx.astype(np.float64), 
+        y_idx.astype(np.float64),
+        z_idx.astype(np.float64),
+        opt
     )
     
     nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
     elems = np.asarray(mesh['elem'], dtype=np.int64)
-    # vol2mesh labels: need to map back
-    tissue_labels = np.asarray(mesh['elemprop'], dtype=np.int32).flatten()
+    
+    # cgalv2m returns a single region - we need to relabel based on centroid positions
+    print("  Assigning tissue labels based on centroid positions...")
+    tissue_labels = assign_tissue_labels_to_mesh(nodes, elems, labels_3d, affine)
     
     elapsed = time.time() - t0
-    print(f"  cgalmesh done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
-    
-    # Map labels: vol2mesh output -> our labels (0=air, 1=scalp, 2=skull, 3=csf, 4=gm, 5=wm)
-    # Convert to 0-based: subtract 1
-    tissue_labels = tissue_labels - 1
-    tissue_labels = np.clip(tissue_labels, 0, 5)
+    print(f"  cgalv2m done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets"
     
     # Print tissue distribution
     tissue_names = ['air', 'scalp', 'skull', 'csf', 'gray', 'white']
@@ -386,6 +395,54 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
             print(f"    {name}: {count:,} tets ({100.0*count/len(tissue_labels):.1f}%)")
     
     return nodes, elems, tissue_labels
+
+
+def assign_tissue_labels_to_mesh(nodes_mm, elems, labels_vol, affine):
+    """
+    Assign tissue labels to mesh elements based on their centroid positions.
+    
+    Args:
+        nodes_mm: (N,3) node positions in mm
+        elems: (M,4) tetrahedra node indices
+        labels_vol: 3D label volume (0=bg, 1=scalp, 2=skull, 3=csf, 4=gm, 5=wm)
+        affine: 4x4 voxel-to-mm transformation
+    
+    Returns:
+        tissue_labels: (M,) int32 tissue type per element
+    """
+    print("    Computing centroids and sampling labels...")
+    inv_aff = np.linalg.inv(affine)
+    
+    # Compute centroids
+    centroids = nodes_mm[elems[:, :4]].mean(axis=1)
+    
+    # Transform to voxel space
+    cents_hom = np.hstack([centroids, np.ones((len(centroids), 1))])
+    vox_coords = (inv_aff @ cents_hom.T).T[:, :3]
+    
+    # Round to nearest voxel
+    vi = np.round(vox_coords[:, 0]).astype(int)
+    vj = np.round(vox_coords[:, 1]).astype(int)
+    vk = np.round(vox_coords[:, 2]).astype(int)
+    
+    # Clip to valid range
+    shape = labels_vol.shape
+    vi = np.clip(vi, 0, shape[0] - 1)
+    vj = np.clip(vj, 0, shape[1] - 1)
+    vk = np.clip(vk, 0, shape[2] - 1)
+    
+    # Sample labels
+    tissue_labels = labels_vol[vi, vj, vk].astype(np.int32)
+    
+    # Count distribution
+    print("    Tissue distribution from volume sampling:")
+    names = ['bg', 'scalp', 'skull', 'csf', 'gm', 'wm']
+    for i, name in enumerate(names):
+        count = np.sum(tissue_labels == i)
+        if count > 0:
+            print(f"      {name}: {count:,} tets ({100.0*count/len(tissue_labels):.1f}%)")
+    
+    return tissue_labels
 
 
 def add_amygdala_to_mesh(nodes_mm, elems, tissue_labels, affine, amyg_radius=6.5):
