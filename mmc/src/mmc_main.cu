@@ -139,23 +139,27 @@ static std::vector<float> parse_wavelengths(const char* str) {
 static void find_source_on_scalp(const HostMesh& mesh,
                                   float& src_x, float& src_y, float& src_z,
                                   float& src_dx, float& src_dy, float& src_dz) {
-    // Find amygdala centroid
+    // Find RIGHT amygdala centroid (positive x hemisphere)
+    // Matches voxel MC convention: right amygdala at ~(+24, -2, -18) in MNI space
     float amyg_cx = 0, amyg_cy = 0, amyg_cz = 0;
     int amyg_count = 0;
     for (int e = 0; e < mesh.num_elements; e++) {
         if (mesh.tissue[e] == TISSUE_AMYGDALA) {
             for (int v = 0; v < 4; v++) {
                 int vi = mesh.elements[e * 4 + v];
-                amyg_cx += mesh.nodes[vi * 3 + 0];
-                amyg_cy += mesh.nodes[vi * 3 + 1];
-                amyg_cz += mesh.nodes[vi * 3 + 2];
+                float nx = mesh.nodes[vi * 3 + 0];
+                if (nx > 0.0f) {
+                    amyg_cx += nx;
+                    amyg_cy += mesh.nodes[vi * 3 + 1];
+                    amyg_cz += mesh.nodes[vi * 3 + 2];
+                    amyg_count++;
+                }
             }
-            amyg_count += 4;
         }
     }
 
     if (amyg_count == 0) {
-        fprintf(stderr, "WARNING: no amygdala elements found, using mesh center\n");
+        fprintf(stderr, "WARNING: no right amygdala elements found, using mesh center\n");
         amyg_cx = (mesh.bbox_min[0] + mesh.bbox_max[0]) * 0.5f;
         amyg_cy = (mesh.bbox_min[1] + mesh.bbox_max[1]) * 0.5f;
         amyg_cz = (mesh.bbox_min[2] + mesh.bbox_max[2]) * 0.5f;
@@ -165,14 +169,24 @@ static void find_source_on_scalp(const HostMesh& mesh,
         amyg_cz /= amyg_count;
     }
 
-    printf("  Amygdala centroid: (%.1f, %.1f, %.1f) mm\n", amyg_cx, amyg_cy, amyg_cz);
+    printf("  Right amygdala centroid: (%.1f, %.1f, %.1f) mm [%d vertices]\n",
+           amyg_cx, amyg_cy, amyg_cz, amyg_count);
 
-    // Project LATERALLY from amygdala toward ipsilateral ear (along ±x axis)
-    // to find temporal scalp surface — the correct fNIRS optode placement.
-    // Previous approach (nearest boundary face) found the inferior surface (bottom of head).
-    float proj_dx = (amyg_cx < 0) ? -1.0f : 1.0f;
-    float proj_dy = 0.0f;
-    float proj_dz = 0.0f;
+    // Project RADIALLY from mesh center through amygdala centroid onto scalp surface
+    // Matches voxel MC strategy (src/detector.cu:32-42): radial projection onto scalp
+    // directly overlying the amygdala — temporal-inferior surface
+    float cx = (mesh.bbox_min[0] + mesh.bbox_max[0]) * 0.5f;
+    float cy = (mesh.bbox_min[1] + mesh.bbox_max[1]) * 0.5f;
+    float cz = (mesh.bbox_min[2] + mesh.bbox_max[2]) * 0.5f;
+
+    float proj_dx = amyg_cx - cx;
+    float proj_dy = amyg_cy - cy;
+    float proj_dz = amyg_cz - cz;
+    float proj_mag = sqrtf(proj_dx*proj_dx + proj_dy*proj_dy + proj_dz*proj_dz);
+    if (proj_mag > 0) { proj_dx /= proj_mag; proj_dy /= proj_mag; proj_dz /= proj_mag; }
+
+    printf("  Mesh center: (%.1f, %.1f, %.1f) mm\n", cx, cy, cz);
+    printf("  Projection direction: (%.3f, %.3f, %.3f)\n", proj_dx, proj_dy, proj_dz);
 
     float best_score = 1e30f;
     float best_x = 0, best_y = 0, best_z = 0;
@@ -269,11 +283,11 @@ static std::vector<Detector> build_mmc_detectors(
     std::vector<float>& out_separations,
     std::vector<float>& out_angles)
 {
-    // Target SDS values matching voxel MC detector layout
-    float target_sds[] = { 8, 10, 15, 20, 25, 28, 30, 32, 35, 38, 40,
-                           20, 25, 30, 35, 20, 25, 30, 35 };
-    float target_angles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              30, 30, 30, 30, -30, -30, -30, -30 };
+    // Target SDS values matching voxel MC detector layout (src/detector.cu:62-100)
+    float target_sds[] = { 8, 8, 15, 20, 22, 25, 28, 30, 33, 35, 40,
+                           20, 25, 30, 35, 20, 25, 30, 35, 25, 35, 25, 35 };
+    float target_angles[] = { 0, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              30, 30, 30, 30, -30, -30, -30, -30, 60, 60, -60, -60 };
     int n_targets = sizeof(target_sds) / sizeof(target_sds[0]);
 
     // Build a tangent frame on the scalp at the source
