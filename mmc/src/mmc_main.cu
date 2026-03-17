@@ -172,26 +172,45 @@ static void find_source_on_scalp(const HostMesh& mesh,
     printf("  Right amygdala centroid: (%.1f, %.1f, %.1f) mm [%d vertices]\n",
            amyg_cx, amyg_cy, amyg_cz, amyg_count);
 
-    // Project RADIALLY from mesh center through amygdala centroid onto scalp surface
-    // Matches voxel MC strategy (src/detector.cu:32-42): radial projection onto scalp
-    // directly overlying the amygdala — temporal-inferior surface
-    float cx = (mesh.bbox_min[0] + mesh.bbox_max[0]) * 0.5f;
-    float cy = (mesh.bbox_min[1] + mesh.bbox_max[1]) * 0.5f;
-    float cz = (mesh.bbox_min[2] + mesh.bbox_max[2]) * 0.5f;
+    // Compute scalp surface centroid as head center (bbox center is unreliable
+    // because MNI bbox is asymmetric: z=[-71,+115], y=[-133,+97])
+    float cx = 0, cy = 0, cz = 0;
+    int scalp_face_count = 0;
+    static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
+    for (int e = 0; e < mesh.num_elements; e++) {
+        if (mesh.tissue[e] != TISSUE_SCALP) continue;
+        for (int f = 0; f < 4; f++) {
+            if (mesh.neighbors[e * 4 + f] != -1) continue;
+            for (int i = 0; i < 3; i++) {
+                int vi = mesh.elements[e * 4 + FV[f][i]];
+                cx += mesh.nodes[vi * 3 + 0];
+                cy += mesh.nodes[vi * 3 + 1];
+                cz += mesh.nodes[vi * 3 + 2];
+            }
+            scalp_face_count++;
+        }
+    }
+    if (scalp_face_count > 0) {
+        cx /= (scalp_face_count * 3);
+        cy /= (scalp_face_count * 3);
+        cz /= (scalp_face_count * 3);
+    }
 
+    // Project radially from head center through amygdala onto scalp surface
+    // Matches voxel MC strategy (src/detector.cu:32-42)
     float proj_dx = amyg_cx - cx;
     float proj_dy = amyg_cy - cy;
     float proj_dz = amyg_cz - cz;
     float proj_mag = sqrtf(proj_dx*proj_dx + proj_dy*proj_dy + proj_dz*proj_dz);
     if (proj_mag > 0) { proj_dx /= proj_mag; proj_dy /= proj_mag; proj_dz /= proj_mag; }
 
-    printf("  Mesh center: (%.1f, %.1f, %.1f) mm\n", cx, cy, cz);
+    printf("  Head center (scalp centroid): (%.1f, %.1f, %.1f) mm [%d faces]\n",
+           cx, cy, cz, scalp_face_count);
     printf("  Projection direction: (%.3f, %.3f, %.3f)\n", proj_dx, proj_dy, proj_dz);
 
     float best_score = 1e30f;
     float best_x = 0, best_y = 0, best_z = 0;
     float best_nx = 0, best_ny = 0, best_nz = 0;
-    static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
 
     for (int e = 0; e < mesh.num_elements; e++) {
         if (mesh.tissue[e] != TISSUE_SCALP) continue;
