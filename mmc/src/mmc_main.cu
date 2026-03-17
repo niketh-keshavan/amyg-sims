@@ -187,76 +187,26 @@ static void find_source_on_scalp(const HostMesh& mesh,
     printf("  Ellipsoidal target: (%.1f, %.1f, %.1f) mm\n",
            target_x, target_y, target_z);
 
-    // Find nearest scalp boundary face to ellipsoidal target point
-    static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
-    float best_score = 1e30f;
-    float best_x = 0, best_y = 0, best_z = 0;
-    float best_nx = 0, best_ny = 0, best_nz = 0;
+    // Use ellipsoidal target directly as source (0.5mm inward from surface)
+    // Surface normal: radial from head center (origin at AC)
+    float nmag = sqrtf(target_x*target_x + target_y*target_y + target_z*target_z);
+    float best_nx = target_x / nmag;
+    float best_ny = target_y / nmag;
+    float best_nz = target_z / nmag;
 
-    for (int e = 0; e < mesh.num_elements; e++) {
-        if (mesh.tissue[e] != TISSUE_SCALP) continue;
-        for (int f = 0; f < 4; f++) {
-            if (mesh.neighbors[e * 4 + f] != -1) continue;
+    // Place source just inside the scalp (0.5mm inward toward head center)
+    src_x = target_x - best_nx * 0.5f;
+    src_y = target_y - best_ny * 0.5f;
+    src_z = target_z - best_nz * 0.5f;
 
-            float fx = 0, fy = 0, fz = 0;
-            for (int i = 0; i < 3; i++) {
-                int vi = mesh.elements[e * 4 + FV[f][i]];
-                fx += mesh.nodes[vi * 3 + 0];
-                fy += mesh.nodes[vi * 3 + 1];
-                fz += mesh.nodes[vi * 3 + 2];
-            }
-            fx /= 3.0f; fy /= 3.0f; fz /= 3.0f;
-
-            float dx = fx - target_x;
-            float dy = fy - target_y;
-            float dz = fz - target_z;
-            float dist2 = dx*dx + dy*dy + dz*dz;
-
-            if (dist2 < best_score) {
-                best_score = dist2;
-                best_x = fx; best_y = fy; best_z = fz;
-
-                int va = mesh.elements[e * 4 + FV[f][0]];
-                int vb = mesh.elements[e * 4 + FV[f][1]];
-                int vc = mesh.elements[e * 4 + FV[f][2]];
-                float e1x = mesh.nodes[vb*3+0]-mesh.nodes[va*3+0];
-                float e1y = mesh.nodes[vb*3+1]-mesh.nodes[va*3+1];
-                float e1z = mesh.nodes[vb*3+2]-mesh.nodes[va*3+2];
-                float e2x = mesh.nodes[vc*3+0]-mesh.nodes[va*3+0];
-                float e2y = mesh.nodes[vc*3+1]-mesh.nodes[va*3+1];
-                float e2z = mesh.nodes[vc*3+2]-mesh.nodes[va*3+2];
-                best_nx = e1y*e2z - e1z*e2y;
-                best_ny = e1z*e2x - e1x*e2z;
-                best_nz = e1x*e2y - e1y*e2x;
-            }
-        }
-    }
-
-    // Normalize face normal
-    float nmag = sqrtf(best_nx*best_nx + best_ny*best_ny + best_nz*best_nz);
-    if (nmag > 0) { best_nx /= nmag; best_ny /= nmag; best_nz /= nmag; }
-
-    // Ensure normal points outward (away from amygdala)
-    float to_amyg_x = amyg_cx - best_x;
-    float to_amyg_y = amyg_cy - best_y;
-    float to_amyg_z = amyg_cz - best_z;
-    if (best_nx*to_amyg_x + best_ny*to_amyg_y + best_nz*to_amyg_z > 0) {
-        best_nx = -best_nx; best_ny = -best_ny; best_nz = -best_nz;
-    }
-
-    // Place source just inside the scalp (0.5mm inward along -outward_normal)
-    src_x = best_x - best_nx * 0.5f;
-    src_y = best_y - best_ny * 0.5f;
-    src_z = best_z - best_nz * 0.5f;
-
-    // Direction: inward (toward amygdala)
+    // Direction: inward (toward head center/amygdala)
     src_dx = -best_nx;
     src_dy = -best_ny;
     src_dz = -best_nz;
 
-    float dist_to_amyg = sqrtf((best_x-amyg_cx)*(best_x-amyg_cx) +
-                               (best_y-amyg_cy)*(best_y-amyg_cy) +
-                               (best_z-amyg_cz)*(best_z-amyg_cz));
+    float dist_to_amyg = sqrtf((target_x-amyg_cx)*(target_x-amyg_cx) +
+                               (target_y-amyg_cy)*(target_y-amyg_cy) +
+                               (target_z-amyg_cz)*(target_z-amyg_cz));
     printf("  Source position: (%.1f, %.1f, %.1f) mm\n", src_x, src_y, src_z);
     printf("  Source direction: (%.3f, %.3f, %.3f)\n", src_dx, src_dy, src_dz);
     printf("  Distance to amygdala: %.1f mm\n", dist_to_amyg);
