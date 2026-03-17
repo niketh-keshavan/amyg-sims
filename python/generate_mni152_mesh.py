@@ -291,65 +291,7 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
 # Step 4: Tetrahedral meshing with TetGen
 # ---------------------------------------------------------------------------
 
-def generate_interior_refinement_points(brain_mask, affine, spacing=8.0):
-    """
-    Generate a grid of interior refinement points within the brain mask.
-    
-    These points force TetGen to create tetrahedra throughout the brain volume,
-    not just at the surface. This is critical for having tet centroids that
-    land in brain tissue (gray/white/amygdala) rather than scalp.
-    
-    Args:
-        brain_mask: (nx,ny,nz) binary mask of brain tissue
-        affine: 4x4 voxel-to-mm transformation matrix
-        spacing: grid spacing in mm (default 8mm gives ~1000 points in brain)
-    
-    Returns:
-        interior_pts: (N,3) array of MNI mm coordinates inside brain
-    """
-    print(f"  Generating interior refinement points (spacing={spacing}mm)...")
-    
-    # Create a grid of points in MNI space
-    # Bounding box of brain is approximately -90 to +90 mm in each dimension
-    x_range = np.arange(-90, 91, spacing)
-    y_range = np.arange(-120, 91, spacing)
-    z_range = np.arange(-80, 91, spacing)
-    
-    xx, yy, zz = np.meshgrid(x_range, y_range, z_range, indexing='ij')
-    grid_pts = np.stack([xx.ravel(), yy.ravel(), zz.ravel(), np.ones(xx.size)], axis=1)
-    
-    # Transform MNI mm -> voxel indices
-    inv_aff = np.linalg.inv(affine)
-    vox_coords = (inv_aff @ grid_pts.T).T[:, :3]
-    
-    # Round to nearest voxel
-    vi = np.round(vox_coords[:, 0]).astype(int)
-    vj = np.round(vox_coords[:, 1]).astype(int)
-    vk = np.round(vox_coords[:, 2]).astype(int)
-    
-    # Clip to valid range
-    shape = brain_mask.shape
-    vi = np.clip(vi, 0, shape[0]-1)
-    vj = np.clip(vj, 0, shape[1]-1)
-    vk = np.clip(vk, 0, shape[2]-1)
-    
-    # Keep only points inside brain mask
-    inside = brain_mask[vi, vj, vk].astype(bool)
-    interior_pts = grid_pts[inside, :3]  # (N, 3) in MNI mm
-    
-    print(f"    Generated {len(interior_pts):,} interior refinement points")
-    
-    # Check amygdala region coverage
-    amyg_center = np.array([24.0, -2.0, -20.0])
-    dist_to_amyg = np.sqrt(np.sum((interior_pts - amyg_center)**2, axis=1))
-    amyg_nearby = np.sum(dist_to_amyg < 10.0)  # Within 10mm
-    print(f"    Points within 10mm of amygdala: {amyg_nearby}")
-    
-    return interior_pts
-
-
-def mesh_with_tetgen(surf_verts, surf_faces, max_vol=15.0, min_dihedral=15.0, 
-                     interior_points=None):
+def mesh_with_tetgen(surf_verts, surf_faces, max_vol=15.0, min_dihedral=15.0):
     """
     Generate a conforming tetrahedral mesh from the scalp surface using TetGen.
 
@@ -358,7 +300,6 @@ def mesh_with_tetgen(surf_verts, surf_faces, max_vol=15.0, min_dihedral=15.0,
         surf_faces: (Nf,3) int32 triangle indices
         max_vol: maximum tet volume in mm³ (controls mesh density)
         min_dihedral: minimum dihedral angle in degrees
-        interior_points: (Ni,3) optional interior refinement points in mm
 
     Returns:
         nodes: (N,3) float64 node positions in mm
@@ -372,25 +313,9 @@ def mesh_with_tetgen(surf_verts, surf_faces, max_vol=15.0, min_dihedral=15.0,
             "  (wraps TetGen by Hang Si, 2002-2018)")
 
     print(f"Meshing with TetGen (max_vol={max_vol:.1f} mm³, min_dihedral={min_dihedral:.0f}°)...")
-    if interior_points is not None and len(interior_points) > 0:
-        print(f"  With {len(interior_points):,} interior refinement points")
     t0 = time.time()
 
-    # Combine surface vertices with interior points if provided
-    if interior_points is not None and len(interior_points) > 0:
-        all_verts = np.vstack([surf_verts, interior_points])
-        # Interior points are marked in the point attribute array
-        # Surface points = 0, Interior points = 1
-        point_attrs = np.zeros(len(all_verts), dtype=np.int32)
-        point_attrs[len(surf_verts):] = 1
-    else:
-        all_verts = surf_verts
-        point_attrs = None
-
-    tet = tetgen.TetGen(all_verts, surf_faces)
-    
-    # Tetrahedralize with interior points
-    # The 'preserve' option keeps interior points in the final mesh
+    tet = tetgen.TetGen(surf_verts, surf_faces)
     tet.tetrahedralize(
         order=1,
         quality=True,
@@ -635,16 +560,14 @@ def generate_mni152_mesh(output_path, max_vol=15.0, min_dihedral=15.0):
     # 3. Extract scalp surface
     print("\n[3/7] Extracting scalp surface...")
     surf_verts, surf_faces = extract_scalp_surface(labels, affine, smooth_sigma=2.5)
-    
-    # Generate interior refinement points from brain mask
-    interior_pts = generate_interior_refinement_points(brain_mask, affine, spacing=8.0)
 
-    # 4. Tetrahedral mesh
+    # 4. Tetrahedral mesh - use smaller max_vol to ensure brain coverage
+    # Default max_vol=15 creates too-sparse interior; use 5.0 for brain tets
     print("\n[4/7] Generating tetrahedral mesh...")
+    mesh_max_vol = 5.0  # Smaller volume = denser mesh in brain
     nodes, elems = mesh_with_tetgen(surf_verts, surf_faces,
-                                     max_vol=max_vol,
-                                     min_dihedral=min_dihedral,
-                                     interior_points=interior_pts)
+                                     max_vol=mesh_max_vol,
+                                     min_dihedral=min_dihedral)
 
     # 5. Assign tissue labels
     print("\n[5/7] Assigning tissue labels...")
