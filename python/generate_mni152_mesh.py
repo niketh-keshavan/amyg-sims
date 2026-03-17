@@ -291,22 +291,22 @@ def extract_scalp_surface(labels, affine, smooth_sigma=1.5):
 # Step 4: Tetrahedral meshing with TetGen
 # ---------------------------------------------------------------------------
 
-def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
+def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
     """
-    Generate multi-tissue brain mesh using cgalmesh from iso2mesh.
-    
-    This uses CGAL's 3D mesh generation from labeled volumes, which is more
-    robust than brain2mesh's surface boolean approach for complex geometries.
-    
+    Generate multi-tissue brain mesh using iso2mesh.brain2mesh.
+
+    brain2mesh creates conforming tetrahedral meshes with proper tissue
+    boundaries, giving adequate resolution at all tissue interfaces including
+    deep brain structures.
+
     Args:
         seg_dict: dict with keys 'scalp', 'skull', 'csf', 'gm', 'wm'
-                  Each is a 3D binary numpy array
-        max_vol: maximum tet volume
-        voxel_size: voxel size in mm (default 1.0)
-    
+                  Each is a 3D binary/probability numpy array
+        max_vol: maximum tet volume in mm³
+
     Returns:
-        nodes: (N,3) float64 node positions in mm
-        elems: (M,4) int64 tetrahedra (node indices)
+        nodes: (N,3) float64 node positions (voxel index space)
+        elems: (M,4) int64 tetrahedra (node indices, 0-indexed)
         tissue_labels: (M,) int32 tissue type per element
     """
     try:
@@ -315,78 +315,57 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
         raise ImportError(
             "Install iso2mesh: pip install iso2mesh or from GitHub\n"
             "  https://github.com/NeuroJSON/pyiso2mesh")
-    
-    print(f"Meshing with cgalmesh (max_vol={max_vol:.1f} mm³)...")
-    print("  Using CGAL 3D mesh generation from labeled volume...")
+
+    print(f"Meshing with brain2mesh (max_vol={max_vol:.1f} mm³)...")
     t0 = time.time()
-    
-    # Create a labeled volume where each voxel has a tissue label
-    # Priority: inner tissues overwrite outer ones
-    shape = seg_dict['scalp'].shape
-    labels_3d = np.zeros(shape, dtype=np.uint8)
-    
-    # Assign labels: 1=scalp, 2=skull, 3=csf, 4=gm, 5=wm
-    # Use priority: inner tissues overwrite outer
-    labels_3d[seg_dict['scalp'] > 0.5] = 1
-    labels_3d[seg_dict['skull'] > 0.5] = 2
-    labels_3d[seg_dict['csf'] > 0.5] = 3
-    labels_3d[seg_dict['gm'] > 0.5] = 4
-    labels_3d[seg_dict['wm'] > 0.5] = 5
-    
-    print(f"  Label volume shape: {labels_3d.shape}")
-    print(f"  Tissue voxel counts:")
-    for i, name in enumerate(['bg', 'scalp', 'skull', 'csf', 'gm', 'wm']):
-        print(f"    {name}: {np.sum(labels_3d == i):,}")
-    
-    # Use vol2mesh to create mesh from labeled volume
-    # This uses CGAL's mesh generation directly
-    print("  Running cgalv2m (CGAL volume meshing)...")
-    # Use cgalv2m which meshes a binary volume directly
-    # Create a binary mask of all brain tissues
-    brain_mask = (labels_3d > 0).astype(np.uint8)
-    
-    # Create options dictionary
-    opt = {
+
+    # brain2mesh expects a dict with tissue probability maps
+    # Keys: 'wm', 'gm', 'csf', 'skull', 'scalp'
+    seg_input = {
+        'scalp': seg_dict['scalp'].astype(np.float64),
+        'skull': seg_dict['skull'].astype(np.float64),
+        'csf': seg_dict['csf'].astype(np.float64),
+        'gm': seg_dict['gm'].astype(np.float64),
+        'wm': seg_dict['wm'].astype(np.float64),
+    }
+
+    print(f"  Input volume shape: {seg_input['scalp'].shape}")
+    for name, vol in seg_input.items():
+        print(f"    {name}: {int((vol > 0.5).sum()):,} voxels")
+
+    cfg = {
         'maxvol': max_vol,
         'radbound': 3.0,
+        'ratio': 1.414,
     }
-    
-    print(f"    Meshing with maxvol={max_vol}...")
-    
-    # Mesh the brain volume - cgalv2m(vol, opt, maxvol)
-    mesh = iso2mesh.cgalv2m(brain_mask, opt, max_vol)
-    
-    # cgalv2m returns either a dict or a tuple (node, elem, face)
-    if isinstance(mesh, tuple):
-        nodes = np.asarray(mesh[0], dtype=np.float64) * voxel_size  # Scale to mm
-        elems = np.asarray(mesh[1], dtype=np.int64)
-    else:
-        nodes = np.asarray(mesh['node'], dtype=np.float64) * voxel_size  # Scale to mm
-        elems = np.asarray(mesh['elem'], dtype=np.int64)
-    
-    # Ensure nodes is (N, 3) - cgalv2m may return (N, 4) with homogeneous coord
+
+    print(f"  Running brain2mesh (this may take several minutes)...")
+    brain_n, brain_el, brain_f = iso2mesh.brain2mesh(seg_input, **cfg)
+
+    nodes = np.asarray(brain_n, dtype=np.float64)
+    elems_raw = np.asarray(brain_el, dtype=np.int64)
+
+    # Ensure nodes is (N, 3)
     if nodes.ndim == 2 and nodes.shape[1] == 4:
         nodes = nodes[:, :3]
-    
-    print(f"    Raw mesh: {len(nodes)} nodes shape {nodes.shape}, elems shape {elems.shape}")
-    
-    # cgalv2m returns elements with format [n1, n2, n3, n4, region_id] (1-indexed)
-    # Extract just the first 4 columns and convert to 0-indexed
-    if elems.shape[1] >= 5:
-        elems = elems[:, :4]  # Extract node indices only
-    elems = elems - 1  # Convert to 0-indexed
-    
-    print(f"    Processed elems shape: {elems.shape}")
-    
-    # cgalv2m returns a single region - we need to relabel based on centroid positions
-    print("  Assigning tissue labels based on centroid positions...")
-    # Build affine: voxel to mm transform (isotropic voxels)
-    affine = np.diag([voxel_size, voxel_size, voxel_size, 1.0])
-    tissue_labels = assign_tissue_labels_to_mesh(nodes, elems, labels_3d, affine)
-    
+
+    print(f"  Raw mesh: {len(nodes)} nodes, elems shape {elems_raw.shape}")
+
+    # brain2mesh returns elements as [n1, n2, n3, n4, tissue_id] (1-indexed)
+    # Extract tissue labels from last column, then node indices
+    if elems_raw.shape[1] >= 5:
+        tissue_labels = elems_raw[:, 4].astype(np.int32)
+        elems = elems_raw[:, :4]
+    else:
+        tissue_labels = np.zeros(len(elems_raw), dtype=np.int32)
+        elems = elems_raw[:, :4]
+
+    # Convert from 1-indexed to 0-indexed
+    elems = elems - 1
+
     elapsed = time.time() - t0
-    print(f"  cgalv2m done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
-    
+    print(f"  brain2mesh done in {elapsed:.1f}s: {len(nodes):,} nodes, {len(elems):,} tets")
+
     # Print tissue distribution
     tissue_names = ['air', 'scalp', 'skull', 'csf', 'gray', 'white']
     print("  Tissue distribution:")
@@ -394,7 +373,7 @@ def mesh_with_cgalmesh(seg_dict, max_vol=100.0, voxel_size=1.0):
         count = np.sum(tissue_labels == i)
         if count > 0:
             print(f"    {name}: {count:,} tets ({100.0*count/len(tissue_labels):.1f}%)")
-    
+
     return nodes, elems, tissue_labels
 
 
@@ -464,26 +443,51 @@ def add_amygdala_to_mesh(nodes_mm, elems, tissue_labels, affine, amyg_radius=6.5
         tissue_labels: updated with TISSUE_AMYGDALA (6) for tets in spheres
     """
     print("  Adding amygdala labels post-brain2mesh...")
-    
+
     # Compute centroids
     centroids = nodes_mm[elems[:, :4]].mean(axis=1)
-    
+
+    print(f"  DEBUG: nodes_mm shape={nodes_mm.shape}, range:")
+    print(f"    x: [{nodes_mm[:,0].min():.1f}, {nodes_mm[:,0].max():.1f}]")
+    print(f"    y: [{nodes_mm[:,1].min():.1f}, {nodes_mm[:,1].max():.1f}]")
+    print(f"    z: [{nodes_mm[:,2].min():.1f}, {nodes_mm[:,2].max():.1f}]")
+    print(f"  DEBUG: centroids shape={centroids.shape}, range:")
+    print(f"    x: [{centroids[:,0].min():.1f}, {centroids[:,0].max():.1f}]")
+    print(f"    y: [{centroids[:,1].min():.1f}, {centroids[:,1].max():.1f}]")
+    print(f"    z: [{centroids[:,2].min():.1f}, {centroids[:,2].max():.1f}]")
+    print(f"  DEBUG: tissue_labels before: {np.bincount(tissue_labels.astype(int), minlength=7)}")
+
     # Amygdala centers in MNI space
     amyg_centers = np.array([[24., -2., -20.], [-24., -2., -20.]])
-    
+
     n_total = 0
     for ac in amyg_centers:
         dist2 = np.sum((centroids - ac)**2, axis=1)
         in_sphere = dist2 <= amyg_radius**2
-        
+
+        min_dist = float(np.sqrt(dist2.min()))
+        closest_idx = int(np.argmin(dist2))
+        closest_centroid = centroids[closest_idx]
+        closest_tissue = tissue_labels[closest_idx]
+
+        # Show 5 closest centroids
+        sorted_idx = np.argsort(dist2)[:5]
+        print(f"    Amygdala center ({ac[0]:+.0f},{ac[1]:+.0f},{ac[2]:+.0f}), radius={amyg_radius}mm:")
+        print(f"      Closest centroid: idx={closest_idx}, pos=({closest_centroid[0]:.1f},{closest_centroid[1]:.1f},{closest_centroid[2]:.1f}), "
+              f"dist={min_dist:.1f}mm, tissue={closest_tissue}")
+        print(f"      5 closest centroids:")
+        for si in sorted_idx:
+            d = float(np.sqrt(dist2[si]))
+            c = centroids[si]
+            print(f"        dist={d:.1f}mm  pos=({c[0]:.1f},{c[1]:.1f},{c[2]:.1f})  tissue={tissue_labels[si]}")
+
         # Override any tissue within sphere (should be GM/WM/CSF)
         tissue_labels[in_sphere] = TISSUE_AMYGDALA
         n = int(np.sum(in_sphere))
         n_total += n
-        min_dist = float(np.sqrt(dist2.min()))
-        print(f"    Amygdala sphere ({ac[0]:+.0f},{ac[1]:+.0f},{ac[2]:+.0f}): "
-              f"{n} tets relabeled, closest centroid {min_dist:.1f}mm")
-    
+        print(f"      => {n} tets relabeled (within {amyg_radius}mm)")
+
+    print(f"  DEBUG: tissue_labels after: {np.bincount(tissue_labels.astype(int), minlength=7)}")
     print(f"  Total amygdala tets: {n_total}")
     return tissue_labels
 
@@ -859,7 +863,7 @@ def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0,
             print("\n[4/7] Generating tetrahedral mesh with brain2mesh...")
             print("  ⚠️  This step takes 10-30 minutes - generating multi-tissue brain mesh...")
             t_mesh = time.time()
-            nodes, elems, tissue_labels = mesh_with_cgalmesh(seg_dict, max_vol=max_vol)
+            nodes, elems, tissue_labels = mesh_with_brain2mesh(seg_dict, max_vol=max_vol)
             print(f"  Mesh generation completed in {time.time()-t_mesh:.1f}s")
             save_checkpoint(checkpoint_dir, step, (nodes, elems, tissue_labels))
     else:
@@ -880,11 +884,13 @@ def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0,
 
     # Step 5: Amygdala labeling
     step = "step5_amygdala"
+    print(f"\n  DEBUG step5: resume={resume}, checkpoint_dir={checkpoint_dir}")
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
         if checkpoint:
             tissue_labels = checkpoint
             print("\n[5/7] Adding amygdala tissue labels... (loaded from checkpoint)")
+            print(f"  DEBUG: LOADED FROM CHECKPOINT - amygdala count={np.sum(tissue_labels == TISSUE_AMYGDALA)}")
         else:
             print("\n[5/7] Adding amygdala tissue labels...")
             with tqdm(total=1, desc="  Labeling amygdala regions", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
