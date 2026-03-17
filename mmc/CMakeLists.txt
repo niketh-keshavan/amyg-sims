@@ -13,9 +13,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-# Source paths
-set(ROOT_SRC ${CMAKE_SOURCE_DIR}/src)
-set(ROOT_INC ${CMAKE_SOURCE_DIR}/include)
+# Source paths (parent directory contains shared sources)
+set(ROOT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+set(ROOT_INC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
 add_executable(mmc_fnirs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mmc_main.cu
