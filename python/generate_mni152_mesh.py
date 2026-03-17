@@ -333,10 +333,9 @@ def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
     
     cfg = {
         'maxvol': max_vol,
-        'maxnode': 100000,  # Reduced to avoid complex boolean operations
-        'smooth': 3,        # More smoothing to reduce self-intersections
-        'ratio': 2.0,       # Relaxed quality ratio for robustness
-        'dorelabel': True,  # Skip layered meshing assumptions (avoids some boolean ops)
+        'maxnode': 50000,   # Further reduced for robustness
+        'smooth': 5,        # Aggressive smoothing to fix self-intersections
+        'ratio': 3.0,       # Very relaxed quality ratio
     }
     
     # Call brain2mesh (this is the slow step - can take 10-30 min)
@@ -700,7 +699,7 @@ def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0,
             pbar.update(1)
         save_checkpoint(checkpoint_dir, step, labels)
 
-    # Step 3: Prepare segmentations
+    # Step 3: Prepare segmentations with smoothing to fix self-intersections
     step = "step3_segdict"
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
@@ -709,35 +708,58 @@ def generate_mni152_mesh(output_path, max_vol=50.0, min_dihedral=15.0,
             print("\n[3/7] Preparing segmentation volumes... (loaded from checkpoint)")
         else:
             print("\n[3/7] Preparing segmentation volumes...")
+            print("  Applying Gaussian smoothing to reduce self-intersections...")
             seg_dict = {}
             tissue_names = ['scalp', 'skull', 'csf', 'gm', 'wm']
-            for name in tqdm(tissue_names, desc="  Creating tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+            
+            # Create raw masks first
+            raw_masks = {}
+            for name in tissue_names:
                 if name == 'scalp':
-                    seg_dict[name] = (labels == TISSUE_SCALP).astype(np.float64)
+                    raw_masks[name] = (labels == TISSUE_SCALP).astype(np.float64)
                 elif name == 'skull':
-                    seg_dict[name] = (labels == TISSUE_SKULL).astype(np.float64)
+                    raw_masks[name] = (labels == TISSUE_SKULL).astype(np.float64)
                 elif name == 'csf':
-                    seg_dict[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
+                    raw_masks[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
                 elif name == 'gm':
-                    seg_dict[name] = (labels == TISSUE_GRAY).astype(np.float64)
+                    raw_masks[name] = (labels == TISSUE_GRAY).astype(np.float64)
                 elif name == 'wm':
-                    seg_dict[name] = (labels == TISSUE_WHITE).astype(np.float64)
+                    raw_masks[name] = (labels == TISSUE_WHITE).astype(np.float64)
+            
+            # Apply smoothing to reduce surface artifacts
+            # This prevents the "ran out of tries to perturb the mesh" error
+            for name in tqdm(tissue_names, desc="  Smoothing tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+                # Gaussian smoothing with sigma=1 voxel
+                smoothed = ndimage.gaussian_filter(raw_masks[name], sigma=1.0)
+                # Threshold at 0.5 to get binary mask back
+                seg_dict[name] = (smoothed > 0.5).astype(np.float64)
+            
             save_checkpoint(checkpoint_dir, step, seg_dict)
     else:
         print("\n[3/7] Preparing segmentation volumes...")
+        print("  Applying Gaussian smoothing to reduce self-intersections...")
         seg_dict = {}
         tissue_names = ['scalp', 'skull', 'csf', 'gm', 'wm']
-        for name in tqdm(tissue_names, desc="  Creating tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+        
+        # Create raw masks first
+        raw_masks = {}
+        for name in tissue_names:
             if name == 'scalp':
-                seg_dict[name] = (labels == TISSUE_SCALP).astype(np.float64)
+                raw_masks[name] = (labels == TISSUE_SCALP).astype(np.float64)
             elif name == 'skull':
-                seg_dict[name] = (labels == TISSUE_SKULL).astype(np.float64)
+                raw_masks[name] = (labels == TISSUE_SKULL).astype(np.float64)
             elif name == 'csf':
-                seg_dict[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
+                raw_masks[name] = ((labels == TISSUE_CSF) | (labels == TISSUE_AMYGDALA)).astype(np.float64)
             elif name == 'gm':
-                seg_dict[name] = (labels == TISSUE_GRAY).astype(np.float64)
+                raw_masks[name] = (labels == TISSUE_GRAY).astype(np.float64)
             elif name == 'wm':
-                seg_dict[name] = (labels == TISSUE_WHITE).astype(np.float64)
+                raw_masks[name] = (labels == TISSUE_WHITE).astype(np.float64)
+        
+        # Apply smoothing
+        for name in tqdm(tissue_names, desc="  Smoothing tissue masks", bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+            smoothed = ndimage.gaussian_filter(raw_masks[name], sigma=1.0)
+            seg_dict[name] = (smoothed > 0.5).astype(np.float64)
+        
         save_checkpoint(checkpoint_dir, step, seg_dict)
     
     print(f"  Segmentation volumes: {labels.shape}")
