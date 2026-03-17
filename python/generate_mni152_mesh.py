@@ -333,9 +333,10 @@ def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
     
     cfg = {
         'maxvol': max_vol,
-        'maxnode': 200000,  # Allow more nodes for better resolution
-        'smooth': 2,        # Some smoothing for quality
-        'ratio': 1.5,       # Quality ratio
+        'maxnode': 100000,  # Reduced to avoid complex boolean operations
+        'smooth': 3,        # More smoothing to reduce self-intersections
+        'ratio': 2.0,       # Relaxed quality ratio for robustness
+        'dorelabel': True,  # Skip layered meshing assumptions (avoids some boolean ops)
     }
     
     # Call brain2mesh (this is the slow step - can take 10-30 min)
