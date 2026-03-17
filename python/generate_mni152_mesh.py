@@ -335,7 +335,7 @@ def mesh_with_brain2mesh(seg_dict, max_vol=100.0):
 
     cfg = {
         'maxvol': max_vol,
-        'radbound': 3.0,
+        'radbound': {'scalp': 3.0, 'skull': 3.0, 'csf': 3.0, 'gm': 3.0, 'wm': 3.0},
         'ratio': 1.414,
     }
 
