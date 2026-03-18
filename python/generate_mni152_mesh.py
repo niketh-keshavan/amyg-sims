@@ -496,8 +496,34 @@ def mesh_with_brain2mesh(labels_vol, max_vol=1.0):
             print(f"    {name}: {count:,}")
 
     opt = {'maxvol': max_vol, 'radbound': 3.0}
-    print(f"  Running cgalv2m...")
-    mesh = iso2mesh.cgalv2m(brain_mask, opt, max_vol)
+    print(f"  Running cgalv2m (this may take 10-30 minutes)...")
+    print(f"  Progress: ", end='', flush=True)
+    
+    # Start progress spinner in background thread
+    import threading
+    import sys
+    stop_spinner = threading.Event()
+    
+    def spinner():
+        chars = ['|', '/', '-', '\\']
+        i = 0
+        while not stop_spinner.is_set():
+            sys.stdout.write(f'\r  Progress: {chars[i % 4]} meshing... ({int(time.time() - t0)}s elapsed)')
+            sys.stdout.flush()
+            stop_spinner.wait(0.5)
+            i += 1
+        sys.stdout.write('\r  Progress: ✓ done                    \n')
+        sys.stdout.flush()
+    
+    spinner_thread = threading.Thread(target=spinner)
+    spinner_thread.daemon = True
+    spinner_thread.start()
+    
+    try:
+        mesh = iso2mesh.cgalv2m(brain_mask, opt, max_vol)
+    finally:
+        stop_spinner.set()
+        spinner_thread.join(timeout=1.0)
 
     if isinstance(mesh, tuple):
         nodes = np.asarray(mesh[0], dtype=np.float64)
