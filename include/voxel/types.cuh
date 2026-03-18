@@ -27,8 +27,8 @@ enum TissueType : uint8_t {
 // ---------------------------------------------------------------------------
 // Photon path recording
 // ---------------------------------------------------------------------------
-#define MAX_PATH_STEPS  2048      // max steps recorded per photon path
-#define PATHS_PER_DET   64        // paths to record per detector
+#define MAX_PATH_STEPS  256       // max steps recorded per photon path (reduced from 2048)
+#define PATHS_PER_DET   16        // paths to record per detector (reduced from 64)
 #define MAX_RECORDED_PATHS (PATHS_PER_DET * 128)  // global cap
 
 // ---------------------------------------------------------------------------
