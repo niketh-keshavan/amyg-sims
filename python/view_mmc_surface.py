@@ -370,7 +370,15 @@ def extract_boundary_surfaces(nodes, elements, tissues, neighbors):
     
     print("Extracting boundary surfaces...")
     
+    num_nodes = len(nodes)
+    bad_elements = 0
+    
     for elem_idx, (elem, tissue, neighbor) in enumerate(zip(elements, tissues, neighbors)):
+        # Validate element vertex indices
+        if any(v < 0 or v >= num_nodes for v in elem):
+            bad_elements += 1
+            continue
+            
         for face_idx in range(4):
             neighbor_elem = neighbor[face_idx]
             
@@ -406,6 +414,9 @@ def extract_boundary_surfaces(nodes, elements, tissues, neighbors):
                         surfaces['white'].append((v0, v1, v2, normal))
                     elif tissue == 6:  # Amygdala boundary with anything
                         surfaces['amygdala'].append((v0, v1, v2, normal))
+    
+    if bad_elements > 0:
+        print(f"  Warning: Skipped {bad_elements} elements with invalid vertex indices")
     
     # Convert to flat arrays for JSON
     result = {}
