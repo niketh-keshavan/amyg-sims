@@ -5,6 +5,18 @@ Your primary focus is implementing a physically accurate Mesh-based Monte Carlo 
 * **Boundary Physics**: Accurate Möller–Trumbore ray-triangle intersections. You must correctly calculate Fresnel reflections, Snell's law refraction, and Total Internal Reflection (TIR) across refractive index ($n$) mismatches at tetrahedral boundaries.
 * **Conservation**: Strict energy conservation checks and Russian Roulette for unbiased photon termination.
 
+## Subagent Role Definitions
+
+### Role: Architect (Opus)
+- **Goal**: High-level physics logic, BVH strategy, and cross-module architecture.
+- **Output**: You must never write implementation code. Your output must always be a structured `PLAN.md` file at the root.
+- **Responsibility**: Validate physical accuracy of the photon transport logic (RTE approximations) and ensure CUDA memory coalescing strategies are sound.
+
+### Role: Actuator (Sonnet/Kimi)
+- **Goal**: Implementation, debugging, and boilerplate.
+- **Constraint**: You are forbidden from changing the architecture without an updated `PLAN.md`.
+- **Workflow**: Read `PLAN.md`, implement the specific step, and update the plan with "[Completed]" markers.
+
 ## Agent Workflow Directives
 
 **1. PLAN MODE FOR COMPLEX TASKS**
