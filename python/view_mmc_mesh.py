@@ -98,7 +98,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         scene.fog = new THREE.Fog(0x050505, 100, 400);
         
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.set(120, 80, 120);
+        // Look at amygdala region (MNI: x~24, y~-2, z~-18)
+        camera.position.set(80, -20, 80);
         
         const renderer = new THREE.WebGLRenderer({{antialias: true}});
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -109,7 +110,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.target.set(0, -10, 0);
+        controls.target.set(24, -2, -18);  // Center on amygdala
         
         // Lighting
         const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
@@ -145,7 +146,7 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         
         // Create mesh from tetrahedra
         const layers = {{}};
-        let wireframeMode = false;
+        let wireframeMode = true;  // Default to wireframe for better visibility
         
         function createTetrahedronMesh(nodes, elements, tissues, tissueFilter) {{
             const geometries = [];
