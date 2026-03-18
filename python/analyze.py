@@ -63,6 +63,37 @@ DET_QE = {
 
 DARK_COUNT_RATE = 1000    # counts/s per detector (typical at 25°C)
 
+# ---------------------------------------------------------------------------
+# Depth specificity / SSR constants
+# ---------------------------------------------------------------------------
+DELTA_HBO_SCALP_UM = 2.0     # typical task-evoked scalp ΔHbO (μM)
+DELTA_HBO_AMYGDALA_UM = 3.0  # expected amygdala response (μM)
+
+# ---------------------------------------------------------------------------
+# Realistic noise model (Scholkmann et al. 2014, Tian & Liu 2014)
+# ---------------------------------------------------------------------------
+# Physiological noise floor (relative intensity fluctuation per measurement)
+# Cardiac (~1 Hz), respiratory (~0.2 Hz), Mayer waves (~0.1 Hz)
+# TD-fNIRS late gates have lower physio noise — gated out superficial pulsation
+PHYSIO_NOISE_CW = 0.005         # 0.5% for CW / early gates
+PHYSIO_NOISE_LATE_GATE = 0.002  # 0.2% for late gates (>3ns)
+SOURCE_STABILITY = 0.001        # 0.1% RMS laser power fluctuation
+
+
+def compute_noise(N_photons, gate_idx):
+    """Realistic noise: shot + physiological + source stability in quadrature."""
+    sigma_shot = 1.0 / np.sqrt(N_photons) if N_photons > 0 else float('inf')
+
+    if gate_idx >= 6:
+        k_physio = PHYSIO_NOISE_LATE_GATE
+    elif gate_idx >= 3:
+        frac = (gate_idx - 3) / 3.0
+        k_physio = PHYSIO_NOISE_CW * (1 - frac) + PHYSIO_NOISE_LATE_GATE * frac
+    else:
+        k_physio = PHYSIO_NOISE_CW
+
+    return np.sqrt(sigma_shot**2 + k_physio**2 + SOURCE_STABILITY**2)
+
 
 def ansi_safe_beam_diameter_mm(power_w, wavelengths_nm, ansi_margin=0.95):
     """Compute minimum beam diameter to keep irradiance <= margin * min(MPE)."""
@@ -227,7 +258,8 @@ def gate_budget(results):
                 delta_hbr = -0.0003
                 delta_od = abs((EPSILON_HBO[wl_idx] * delta_hbo +
                                 EPSILON_HBR[wl_idx] * delta_hbr) * amyg)
-                snr = delta_od * np.sqrt(N_det) if N_det > 0 else 0
+                noise = compute_noise(N_det, g_idx)
+                snr = delta_od / noise if noise > 0 else 0
 
                 print(f"  {det['sds_mm']:5.0f}  {GATE_LABELS[g_idx]:>8s}  "
                       f"{N_det:12.2e}  {amyg:10.6f}  {delta_od:10.2e}  {snr:10.4f}")
@@ -265,7 +297,7 @@ def mbll_single(results):
                 amyg = gate.get("partial_pathlength_mm", {}).get("amygdala", 0)
                 N_gate = gw * scale * MEAS_TIME_S * qe
                 N_total = N_gate + DARK_COUNT_RATE * MEAS_TIME_S
-                noise = 1.0 / np.sqrt(N_total) if N_total > 0 else float('inf')
+                noise = compute_noise(N_total, g_idx)
                 det_data[key][wl_key] = {
                     'amyg_pl': amyg, 'N_gate': N_gate, 'noise': noise,
                     'det_id': det['id']
@@ -356,7 +388,8 @@ def mbll_multi_channel(results):
             g1 = det1["time_gates"][g_idx]
             L0 = g0.get("partial_pathlength_mm", {}).get("amygdala", 0)
             L1 = g1.get("partial_pathlength_mm", {}).get("amygdala", 0)
-            if L0 <= 0 or L1 <= 0:
+            # Minimum amygdala pathlength threshold: 0.01 mm
+            if L0 <= 0.01 or L1 <= 0.01:
                 continue
 
             gw0 = g0.get("weight", 0)
@@ -367,17 +400,22 @@ def mbll_multi_channel(results):
             N0 = gw0 * scale0 * MEAS_TIME_S * qe0 + DARK_COUNT_RATE * MEAS_TIME_S
             N1 = gw1 * scale1 * MEAS_TIME_S * qe1 + DARK_COUNT_RATE * MEAS_TIME_S
 
+            scalp_pl_0 = g0.get("partial_pathlength_mm", {}).get("scalp", 1.0)
+            scalp_pl_1 = g1.get("partial_pathlength_mm", {}).get("scalp", 1.0)
             gate_data.append({
                 'gate': g_idx, 'L0': L0, 'L1': L1,
                 'N0': N0, 'N1': N1,
-                'sigma0': 1.0/np.sqrt(N0) if N0 > 0 else float('inf'),
-                'sigma1': 1.0/np.sqrt(N1) if N1 > 0 else float('inf'),
+                'sigma0': compute_noise(N0, g_idx),
+                'sigma1': compute_noise(N1, g_idx),
+                'scalp_pl_0': scalp_pl_0, 'scalp_pl_1': scalp_pl_1,
             })
 
         if gate_data:
-            # Detector-level metric: sum of (L_amyg * sqrt(N)) across all valid gates
-            metric = sum(gd['L0']*np.sqrt(gd['N0']) + gd['L1']*np.sqrt(gd['N1'])
-                         for gd in gate_data)
+            metric = sum(
+                (gd['L0'] / max(gd['scalp_pl_0'], 0.001)) * np.sqrt(gd['N0']) +
+                (gd['L1'] / max(gd['scalp_pl_1'], 0.001)) * np.sqrt(gd['N1'])
+                for gd in gate_data
+            )
             all_det_info.append({
                 'det_id': det_idx, 'sds': sds, 'angle': angle,
                 'gates': gate_data, 'metric': metric
@@ -556,8 +594,8 @@ def time_sweep(results):
             scale1 = N_per_sec[1] / r1["num_photons"]
             N0 = gw0 * scale0 * 1.0 * DET_QE[WL_KEYS[0]] + DARK_COUNT_RATE
             N1 = gw1 * scale1 * 1.0 * DET_QE[WL_KEYS[1]] + DARK_COUNT_RATE
-            n0 = 1.0 / np.sqrt(N0) if N0 > 0 else float('inf')
-            n1 = 1.0 / np.sqrt(N1) if N1 > 0 else float('inf')
+            n0 = compute_noise(N0, g_idx)
+            n1 = compute_noise(N1, g_idx)
 
             E = np.array([
                 [EPSILON_HBO[0]*L0, EPSILON_HBR[0]*L0],
@@ -608,6 +646,127 @@ def safety_check():
               f"({'SAFE' if ratio < 1 else 'EXCEEDS MPE'})")
 
 
+# ===================================================================
+# 8. DEPTH SPECIFICITY (contamination ratio)
+# ===================================================================
+def depth_specificity(results):
+    print("\n" + "=" * 80)
+    print("8. DEPTH SPECIFICITY (amygdala vs scalp contamination)")
+    print(f"   Assumed: scalp dHbO={DELTA_HBO_SCALP_UM} uM, amygdala dHbO={DELTA_HBO_AMYGDALA_UM} uM")
+    print("=" * 80)
+
+    r = results[WL_KEYS[0]]
+    wl_idx = 0
+
+    print(f"\n  {'Det':>4s}  {'SDS':>5s}  {'Gate':>8s}  {'AmygPL':>8s}  {'ScalpPL':>8s}  "
+          f"{'ContamR':>8s}  {'Specif%':>8s}  {'CW_ContR':>8s}  {'TD_gain':>8s}")
+    print("  " + "-" * 82)
+
+    for det in r["detectors"]:
+        cw_ppl = det.get("partial_pathlength_mm", {})
+        cw_amyg = cw_ppl.get("amygdala", 0)
+        cw_scalp = cw_ppl.get("scalp", 1)
+
+        if cw_amyg <= 0:
+            continue
+
+        cw_dOD_scalp = EPSILON_HBO[wl_idx] * DELTA_HBO_SCALP_UM * 1e-3 * cw_scalp
+        cw_dOD_amyg = EPSILON_HBO[wl_idx] * DELTA_HBO_AMYGDALA_UM * 1e-3 * cw_amyg
+        cw_contam = cw_dOD_scalp / cw_dOD_amyg if cw_dOD_amyg > 0 else float('inf')
+
+        gates = det.get("time_gates", [])
+        best_gate = None
+        best_spec = 0
+        for g_idx, gate in enumerate(gates):
+            ppl = gate.get("partial_pathlength_mm", {})
+            amyg = ppl.get("amygdala", 0)
+            scalp = ppl.get("scalp", 1)
+            if amyg <= 0:
+                continue
+            dOD_s = EPSILON_HBO[wl_idx] * DELTA_HBO_SCALP_UM * 1e-3 * scalp
+            dOD_a = EPSILON_HBO[wl_idx] * DELTA_HBO_AMYGDALA_UM * 1e-3 * amyg
+            spec = dOD_a / (dOD_a + dOD_s) if (dOD_a + dOD_s) > 0 else 0
+            if spec > best_spec:
+                best_spec = spec
+                best_gate = (g_idx, amyg, scalp, dOD_s / dOD_a if dOD_a > 0 else float('inf'))
+
+        if best_gate:
+            g_idx, amyg, scalp, contam = best_gate
+            td_gain = cw_contam / contam if contam > 0 else float('inf')
+            print(f"  {det['id']:4d}  {det['sds_mm']:5.0f}  {GATE_LABELS[g_idx]:>8s}  "
+                  f"{amyg:8.4f}  {scalp:8.1f}  {contam:7.1f}x  "
+                  f"{best_spec*100:7.2f}%  {cw_contam:7.0f}x  {td_gain:7.1f}x")
+
+    print(f"\n  ContamR = scalp_signal / amygdala_signal (lower = better)")
+    print(f"  Specif% = amygdala / (amygdala + scalp) signal fraction")
+    print(f"  TD_gain = CW_contam / TD_contam (TD gating improvement factor)")
+
+
+# ===================================================================
+# 9. SHORT-SEPARATION REGRESSION vs TD-GATING
+# ===================================================================
+def ssr_comparison(results):
+    print("\n" + "=" * 80)
+    print("9. SHORT-SEPARATION REGRESSION (SSR) vs TD-GATING")
+    print("=" * 80)
+
+    r = results[WL_KEYS[0]]
+
+    ssr_dets = [d for d in r["detectors"] if d["sds_mm"] <= 10]
+    if not ssr_dets:
+        print("  No short-separation detectors found (SDS <= 10mm)")
+        return
+
+    ssr_scalp_cw = np.mean([d["partial_pathlength_mm"].get("scalp", 0) for d in ssr_dets])
+    ssr_amyg_cw = np.mean([d["partial_pathlength_mm"].get("amygdala", 0) for d in ssr_dets])
+
+    print(f"\n  SSR reference: {len(ssr_dets)} detectors at SDS<=10mm")
+    print(f"  SSR CW scalp PL: {ssr_scalp_cw:.2f} mm, amygdala PL: {ssr_amyg_cw:.6f} mm")
+
+    print(f"\n  CW + SSR REGRESSION:")
+    print(f"  {'Det':>4s}  {'SDS':>5s}  {'L_amyg':>8s}  {'L_scalp':>8s}  "
+          f"{'beta':>6s}  {'L_amyg_corr':>12s}  {'Preserved%':>10s}")
+    print("  " + "-" * 65)
+
+    long_dets = [d for d in r["detectors"] if d["sds_mm"] > 15]
+
+    for det in long_dets:
+        ppl = det.get("partial_pathlength_mm", {})
+        amyg = ppl.get("amygdala", 0)
+        scalp = ppl.get("scalp", 0)
+        if amyg <= 0:
+            continue
+
+        beta = scalp / ssr_scalp_cw if ssr_scalp_cw > 0 else 0
+        amyg_corrected = amyg - beta * ssr_amyg_cw
+        preserved = amyg_corrected / amyg * 100 if amyg > 0 else 0
+
+        print(f"  {det['id']:4d}  {det['sds_mm']:5.0f}  {amyg:8.6f}  {scalp:8.2f}  "
+              f"{beta:6.2f}  {amyg_corrected:12.6f}  {preserved:9.1f}%")
+
+    print(f"\n  TD-GATED (no SSR needed) — late gates preserve amygdala signal:")
+    print(f"  {'Det':>4s}  {'SDS':>5s}  {'Gate':>8s}  {'L_amyg':>8s}  {'L_scalp':>8s}  "
+          f"{'Ratio':>8s}")
+    print("  " + "-" * 55)
+
+    for det in long_dets:
+        gates = det.get("time_gates", [])
+        if len(gates) < 10:
+            continue
+        g = gates[9]
+        ppl = g.get("partial_pathlength_mm", {})
+        amyg = ppl.get("amygdala", 0)
+        scalp = ppl.get("scalp", 0)
+        if amyg <= 0:
+            continue
+        ratio = amyg / scalp * 100 if scalp > 0 else 0
+        print(f"  {det['id']:4d}  {det['sds_mm']:5.0f}  {'5ns+':>8s}  {amyg:8.4f}  "
+              f"{scalp:8.1f}  {ratio:7.3f}%")
+
+    print(f"\n  CONCLUSION: TD-gating improves amygdala/scalp ratio without")
+    print(f"  sacrificing amygdala signal (unlike SSR which subtracts it)")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="fNIRS MC -- TD-Gated Analysis (optimized config)")
@@ -624,6 +783,7 @@ def main():
     print(f"  Laser: {LASER_POWER_W*1e3:.0f} mW ({BEAM_DIAMETER_MM:.0f}mm beam) | "
           f"Det: Si-PMT ({DET_QE[WL_KEYS[0]]*100:.0f}%/{DET_QE[WL_KEYS[1]]*100:.0f}%) | "
           f"Dark: {DARK_COUNT_RATE} cps")
+    print(f"  Noise: shot + physio ({PHYSIO_NOISE_CW*100:.1f}%CW/{PHYSIO_NOISE_LATE_GATE*100:.1f}%late) + source ({SOURCE_STABILITY*100:.1f}%) in quadrature")
     if not args.no_irf:
         print(f"  IRF: Gaussian {args.irf_fwhm:.0f}ps FWHM (realistic temporal blurring)")
     else:
@@ -653,6 +813,8 @@ def main():
     block_design(multi_result, best_configs)
     time_sweep(results)
     safety_check()
+    depth_specificity(results)
+    ssr_comparison(results)
 
     print("\n" + "=" * 80)
     print("VERDICT")
