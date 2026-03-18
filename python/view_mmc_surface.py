@@ -245,14 +245,57 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
 '''
 
 
+def compute_neighbors(elements):
+    """Compute tet-to-tet neighbor connectivity from element faces."""
+    print("Computing neighbor connectivity...")
+    
+    # Build face -> element mapping
+    # Face is represented as sorted tuple of 3 vertex indices
+    face_to_elem = {}
+    
+    for elem_idx, elem in enumerate(elements):
+        for face_idx in range(4):
+            fv = FACE_VERTS[face_idx]
+            # Get face vertices
+            v0, v1, v2 = elem[fv[0]], elem[fv[1]], elem[fv[2]]
+            # Sort to get canonical face representation
+            face_key = tuple(sorted([v0, v1, v2]))
+            
+            if face_key in face_to_elem:
+                # This face is shared with another element
+                other_elem, other_face = face_to_elem[face_key]
+                face_to_elem[face_key] = (other_elem, other_face, elem_idx, face_idx)
+            else:
+                face_to_elem[face_key] = (elem_idx, face_idx)
+    
+    # Build neighbor arrays
+    num_elems = len(elements)
+    neighbors = [[-1, -1, -1, -1] for _ in range(num_elems)]
+    
+    boundary_count = 0
+    for face_key, info in face_to_elem.items():
+        if len(info) == 4:
+            # Shared face
+            elem1, face1, elem2, face2 = info
+            neighbors[elem1][face1] = elem2
+            neighbors[elem2][face2] = elem1
+        else:
+            # Boundary face
+            boundary_count += 1
+    
+    print(f"  {boundary_count} boundary faces, {len(face_to_elem) - boundary_count} shared faces")
+    return neighbors
+
+
 def load_mmcmesh(mesh_path):
     """Load MMC mesh from binary file."""
     with open(mesh_path, 'rb') as f:
-        # Header
+        # Header (48 bytes)
         magic = struct.unpack('I', f.read(4))[0]
         version = struct.unpack('I', f.read(4))[0]
         num_nodes = struct.unpack('I', f.read(4))[0]
         num_elems = struct.unpack('I', f.read(4))[0]
+        bbox = struct.unpack('6f', f.read(24))
         
         print(f"Loading mesh: {num_nodes:,} nodes, {num_elems:,} elements")
         
@@ -271,13 +314,8 @@ def load_mmcmesh(mesh_path):
         # Read tissues
         tissues = struct.unpack(f'{num_elems}i', f.read(num_elems * 4))
         
-        # Read neighbors
-        neighbors = []
-        for i in range(num_elems):
-            n0, n1, n2, n3 = struct.unpack('4i', f.read(16))
-            neighbors.append([n0, n1, n2, n3])
-        
-        print(f"  Loaded {len(neighbors)} neighbor arrays")
+        # Neighbors are NOT in the file - compute them
+        neighbors = compute_neighbors(elements)
         
     return nodes, elements, tissues, neighbors
 
