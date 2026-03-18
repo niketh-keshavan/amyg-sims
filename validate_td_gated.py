@@ -31,10 +31,11 @@ def validate_cw_output(data_dir, wavelength):
     with open(json_path) as f:
         data = json.load(f)
     
-    print(f"Config: {data['config']['num_photons']:,} photons")
-    print(f"Wavelength: {data['config']['wavelength_nm']}nm")
-    print(f"Source: ({data['source']['x']:.1f}, {data['source']['y']:.1f}, {data['source']['z']:.1f})")
+    print(f"Photons: {data['num_photons']:,}")
+    print(f"Wavelength: {data['wavelength_nm']}nm")
+    print(f"Model: {data.get('geometry_model', 'unknown')}")
     print(f"Detectors: {len(data['detectors'])}")
+    print(f"TPSF bins: {data.get('tpsf_bins', 'unknown')} x {data.get('tpsf_bin_ps', 'unknown')} ps")
     print()
     
     # Check detector results
