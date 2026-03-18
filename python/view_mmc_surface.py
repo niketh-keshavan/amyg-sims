@@ -251,7 +251,7 @@ def compute_neighbors(elements):
     
     # Build face -> element mapping
     # Face is represented as sorted tuple of 3 vertex indices
-    face_to_elem = {}
+    face_to_elem = {}  # face_key -> [(elem_idx, face_idx), ...]
     
     for elem_idx, elem in enumerate(elements):
         for face_idx in range(4):
@@ -261,29 +261,32 @@ def compute_neighbors(elements):
             # Sort to get canonical face representation
             face_key = tuple(sorted([v0, v1, v2]))
             
-            if face_key in face_to_elem:
-                # This face is shared with another element
-                other_elem, other_face = face_to_elem[face_key]
-                face_to_elem[face_key] = (other_elem, other_face, elem_idx, face_idx)
-            else:
-                face_to_elem[face_key] = (elem_idx, face_idx)
+            if face_key not in face_to_elem:
+                face_to_elem[face_key] = []
+            face_to_elem[face_key].append((elem_idx, face_idx))
     
     # Build neighbor arrays
     num_elems = len(elements)
     neighbors = [[-1, -1, -1, -1] for _ in range(num_elems)]
     
     boundary_count = 0
-    for face_key, info in face_to_elem.items():
-        if len(info) == 4:
-            # Shared face
-            elem1, face1, elem2, face2 = info
+    shared_count = 0
+    for face_key, elem_list in face_to_elem.items():
+        if len(elem_list) == 2:
+            # Shared face between two elements
+            elem1, face1 = elem_list[0]
+            elem2, face2 = elem_list[1]
             neighbors[elem1][face1] = elem2
             neighbors[elem2][face2] = elem1
-        else:
+            shared_count += 1
+        elif len(elem_list) == 1:
             # Boundary face
             boundary_count += 1
+        else:
+            # Should not happen in valid mesh
+            print(f"  Warning: face {face_key} has {len(elem_list)} elements")
     
-    print(f"  {boundary_count} boundary faces, {len(face_to_elem) - boundary_count} shared faces")
+    print(f"  {boundary_count} boundary faces, {shared_count} shared faces")
     return neighbors
 
 
