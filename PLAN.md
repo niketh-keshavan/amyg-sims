@@ -181,7 +181,7 @@ This replaces:
 
 **Estimated speedup**: 3-10x (exit-face finding is the innermost loop of the transport kernel, called once per boundary crossing, multiple times per scatter event).
 
-### Fix B [MEDIUM IMPACT — Delegate to Actuator]: Precompute entry-face lookup table
+### Fix B [MEDIUM IMPACT — COMPLETED]: Precompute entry-face lookup table
 
 **File**: `mmc/src/mmc_kernel.cu:643-649`
 
@@ -204,7 +204,7 @@ Single global memory read, no branching.
 
 **Where to build it**: In `mmc_mesh.cu`, add to `precompute_face_geometry()` or a new function. Add `int* face_pair` field to `MeshData` struct. Upload alongside other mesh data.
 
-### Fix C [MEDIUM IMPACT — Delegate to Actuator]: Reduce path recording buffer
+### Fix C [MEDIUM IMPACT — COMPLETED]: Reduce path recording buffer
 
 **File**: `mmc/src/mmc_kernel.cu:737-743`
 
@@ -216,7 +216,7 @@ Single global memory read, no branching.
 
 **WARNING**: Verify that reducing these constants doesn't break the voxel MC build. Both MMC and voxel MC share `types.cuh`.
 
-### Fix D [LOW IMPACT — Delegate to Actuator]: Pass `face_normals`/`face_d` to kernel
+### Fix D [LOW IMPACT — COMPLETED]: Pass `face_normals`/`face_d` to kernel
 
 Currently `face_normals` and `face_d` are passed to `mmc_kernel()` as parameters (lines 363-364) but `ray_tet_exit()` doesn't receive them. After Fix A is designed, update `ray_tet_exit` signature to accept these pointers.
 
@@ -325,3 +325,4 @@ python3 validate_td_gated.py data_mmc_100M --wavelength 730
 | 2026-03-17 | Updated to 10-100B photons after discovering 0.04% amygdala volume (146 tets) |
 | 2026-03-17 | **VALIDATED**: TD-gated enhancement factor 100-400x, GO for 10B photons |
 | 2026-03-17 | Added Step 8: kernel perf optimization (0.37 → target 10-50 Mph/s) before production run |
+| 2026-03-17 | **COMPLETED**: Fixes B, C, D implemented - face_pair lookup, reduced path buffer, kernel params |
