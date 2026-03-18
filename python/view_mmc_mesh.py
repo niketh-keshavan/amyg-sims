@@ -59,12 +59,12 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         <p><span class="label">Displayed:</span> <span class="stat">{displayed_tets:,}</span></p>
         <p><span class="label">Tissues:</span></p>
         <p style="margin-left: 10px;">
-            <span style="color: #ff6666;">■</span> Scalp<br>
-            <span style="color: #dddddd;">■</span> Skull<br>
-            <span style="color: #66ccff;">■</span> CSF<br>
-            <span style="color: #ff99cc;">■</span> Gray Matter<br>
-            <span style="color: #eeeeee;">■</span> White Matter<br>
-            <span style="color: #ffcc00;">■</span> <b>Amygdala</b>
+            <span style="color: #ff6666;">[ ]</span> Scalp<br>
+            <span style="color: #dddddd;">[ ]</span> Skull<br>
+            <span style="color: #66ccff;">[ ]</span> CSF<br>
+            <span style="color: #ff99cc;">[ ]</span> Gray Matter<br>
+            <span style="color: #eeeeee;">[ ]</span> White Matter<br>
+            <span style="color: #ffcc00;">[ ]</span> <b>Amygdala</b>
         </p>
         <hr style="border-color: #444;">
         <p><b>Controls:</b></p>
@@ -373,8 +373,8 @@ def create_mesh_viewer(mesh_path, output_file, max_tets=50000):
         tissues_json=tissues_json
     )
     
-    # Write output
-    with open(output_file, 'w') as f:
+    # Write output with UTF-8 encoding
+    with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html)
     
     print(f"\n{'='*60}")
