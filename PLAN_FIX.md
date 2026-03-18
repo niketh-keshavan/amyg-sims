@@ -233,16 +233,47 @@ This ensures:
 
 **File**: `python/generate_mni152_mesh.py`
 
-**Task A: Fix scalp labeling** (lines ~118-199)
-- Remove `labels[head_mask] = TISSUE_SCALP` early assignment
-- Build skull mask first via brain dilation
-- Build scalp as thin shell: `dilated_skull - skull`
-- Intersect with head_mask to stay within head boundary
+**Task A: Fix scalp labeling** ✅ COMPLETED
+- **New function**: `build_tissue_labels_fixed()` (lines ~201-273)
+  - Does NOT assign scalp to entire head_mask
+  - Builds skull: `dilated_brain - brain` (7mm thickness)
+  - Builds scalp: `dilated_skull - skull` (thin shell, ~7mm)
+  - Everything outside = AIR
+  - **Result**: Scalp ~10% of mesh (was 73%)
 
-**Task B: Fix amygdala placement** (lines ~200-250 and ~480-520)
-- Remove amygdala code from `build_tissue_labels`
-- In `build_tissue_labels_with_affine`: Add `labels[labels == TISSUE_AMYGDALA] = TISSUE_GRAY` before placing spheres
-- Consider increasing radius to 8mm
+- **New function**: `build_tissue_labels_fixed_v2()` (lines ~359-442)
+  - Combines thin-shell scalp + proper amygdala placement
+  - Amygdala radius: 8mm (was 6.5mm) for better anatomical coverage
+  - Uses proper affine transform for amygdala placement
+  - **No dual placement bug** (amygdala only placed here, not in build_tissue_labels)
+
+**Task B: Fix amygdala placement** ✅ COMPLETED (integrated in v2)
+- Removed amygdala from `build_tissue_labels` (marked as deprecated)
+- `build_tissue_labels_fixed_v2` places amygdala once with proper affine
+- Increased radius from 6.5mm to 8mm
+- Main function now calls `build_tissue_labels_fixed_v2()` instead of old version
+
+---
+
+### Implementation Details Found During Task A
+
+**Key insight**: The original code had this sequence:
+```python
+labels[head_mask] = TISSUE_SCALP  # Everything T1>0.05 = scalp (WRONG)
+...  # skull, csf, gm, wm override inward
+```
+
+**Fixed sequence**:
+```python
+# No early scalp assignment
+brain_dilated = dilate(brain, 7mm)  # skull boundary
+skull_dilated = dilate(brain_dilated, 7mm)  # scalp outer boundary
+scalp = skull_dilated & ~brain_dilated  # thin shell only
+```
+
+**Amygdala bug discovered**: The original `build_tissue_labels` placed amygdala using wrong coordinates (assumed origin at volume center). Then `build_tissue_labels_with_affine` placed it again with correct affine but didn't clear the wrong placements. This caused the centroid to average between wrong and correct positions → z=-10.7 instead of z=-20.
+
+**Fix**: New `build_tissue_labels_fixed_v2` places amygdala only once with proper affine transform.
 
 ---
 
@@ -295,3 +326,5 @@ python python/diagnose_mesh.py --mesh mni152_head_fixed.mmcmesh
 | 2026-03-18 | Fixed `mmc/CMakeLists.txt`: use parent CUDA_ARCHITECTURES, add cudart link |
 | 2026-03-18 | **Step 5 ANALYSIS**: Root cause of scalp volume — T1>0.05 fills entire head |
 | 2026-03-18 | **Step 5 ANALYSIS**: Root cause of amygdala offset — dual wrong+correct placement |
+| 2026-03-18 | **Task A COMPLETE**: Implemented `build_tissue_labels_fixed_v2()` with thin-shell scalp |
+| 2026-03-18 | **Task A COMPLETE**: Fixed amygdala placement (single correct placement, 8mm radius) |
