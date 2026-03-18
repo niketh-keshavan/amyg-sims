@@ -29,11 +29,14 @@ target_include_directories(mmc_fnirs PRIVATE
     ${ROOT_INC}/voxel
 )
 
-target_link_libraries(mmc_fnirs PRIVATE ${CURAND_LINK})
+target_link_libraries(mmc_fnirs PRIVATE ${CURAND_LINK} CUDA::cudart)
 
-# Set CUDA architectures (supports RTX 3090 = sm_86)
+# Set CUDA architectures (use parent setting if available, otherwise auto-detect)
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86 89 90)
+endif()
 set_target_properties(mmc_fnirs PROPERTIES
-    CUDA_ARCHITECTURES "75;80;86"
+    CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}"
 )
 
 target_compile_options(mmc_fnirs PRIVATE
