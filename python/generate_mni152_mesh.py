@@ -907,7 +907,7 @@ def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0,
     step = "step1_atlas"
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
-        if checkpoint:
+        if checkpoint is not None:
             t1, gm, wm, csf, brain_mask, affine = checkpoint
         else:
             print("\n[1/7] Loading atlas...")
@@ -926,7 +926,7 @@ def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0,
     step = "step2_labels"
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
-        if checkpoint:
+        if checkpoint is not None:
             labels = checkpoint
         else:
             print("\n[2/7] Building tissue label volume...")
@@ -945,7 +945,7 @@ def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0,
     step = "step3_segdict"
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
-        if checkpoint:
+        if checkpoint is not None:
             seg_dict = checkpoint
             print("\n[3/7] Preparing segmentation volumes... (loaded from checkpoint)")
         else:
@@ -1012,7 +1012,7 @@ def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0,
     step = "step4_mesh"
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
-        if checkpoint:
+        if checkpoint is not None:
             nodes, elems, tissue_labels = checkpoint
             print("\n[4/7] Generating tetrahedral mesh... (loaded from checkpoint)")
             print(f"    Mesh: {len(nodes):,} nodes, {len(elems):,} tets")
@@ -1044,7 +1044,7 @@ def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0,
     print(f"\n  DEBUG step5: resume={resume}, checkpoint_dir={checkpoint_dir}")
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
-        if checkpoint:
+        if checkpoint is not None:
             tissue_labels = checkpoint
             print("\n[5/7] Adding amygdala tissue labels... (loaded from checkpoint)")
             print(f"  DEBUG: LOADED FROM CHECKPOINT - amygdala count={np.sum(tissue_labels == TISSUE_AMYGDALA)}")
@@ -1065,7 +1065,7 @@ def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0,
     step = "step6_neighbors"
     if resume:
         checkpoint = load_checkpoint(checkpoint_dir, step)
-        if checkpoint:
+        if checkpoint is not None:
             neighbors = checkpoint
             print("\n[6/7] Building neighbor connectivity... (loaded from checkpoint)")
         else:
