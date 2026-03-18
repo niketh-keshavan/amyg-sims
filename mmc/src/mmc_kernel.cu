@@ -442,7 +442,9 @@ __global__ void mmc_kernel(
 
             // Traverse through tetrahedra until scattering event
             bool scattered = false;
-            while (s_remain > 1e-8f) {
+            int boundary_crossings = 0;
+            const int MAX_BOUNDARY_CROSSINGS = 10000;  // Safety limit
+            while (s_remain > 1e-8f && boundary_crossings < MAX_BOUNDARY_CROSSINGS) {
                 // Find exit face and distance
                 int exit_face;
                 float d_exit = ray_tet_exit(px, py, pz, ddx, ddy, ddz,
@@ -493,6 +495,7 @@ __global__ void mmc_kernel(
                 pz += ddz * d_exit;
                 ppl[ttype] += d_exit;
                 total_pl += d_exit;
+                boundary_crossings++;
 
                 // Absorb proportional weight for this sub-step
                 if (mu_t > 1e-10f) {
@@ -613,6 +616,14 @@ __global__ void mmc_kernel(
                 // The entry face in the neighbor is the face shared with current_tet
                 // Use precomputed face_pair for O(1) lookup (Fix B)
                 int new_entry_face = face_pair[current_tet * 4 + exit_face];
+                
+                // Safety check: new_entry_face should be 0-3 for valid interior faces
+                if (new_entry_face < 0 || new_entry_face > 3) {
+                    // Invalid entry face - this shouldn't happen for interior faces
+                    // Terminate photon to avoid infinite loop
+                    weight = 0.0f;
+                    break;
+                }
 
                 current_tet = neighbor;
                 entry_face = new_entry_face;
