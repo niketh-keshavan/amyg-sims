@@ -21,12 +21,12 @@ add_executable(mmc_fnirs
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mmc_main.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mmc_mesh.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mmc_kernel.cu
-    ${ROOT_SRC}/optical_properties.cu
+    ${ROOT_SRC}/voxel/optical_properties.cu
 )
 
 target_include_directories(mmc_fnirs PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${ROOT_INC}
+    ${ROOT_INC}/voxel
 )
 
 target_link_libraries(mmc_fnirs PRIVATE ${CURAND_LINK})
