@@ -172,41 +172,105 @@ static void find_source_on_scalp(const HostMesh& mesh,
     printf("  Right amygdala centroid: (%.1f, %.1f, %.1f) mm [%d vertices]\n",
            amyg_cx, amyg_cy, amyg_cz, amyg_count);
 
-    // Ellipsoidal projection matching voxel MC (src/detector.cu:32-42)
-    // Head semi-axes: (78, 95, 85) mm
-    // Source is placed inferior to amygdala so photons travel UP through it.
-    float ea = amyg_cx / 78.0f;
-    float eb = amyg_cy / 95.0f;
-    float ec = amyg_cz / 85.0f;
-    float t_scalp = 1.0f / sqrtf(ea*ea + eb*eb + ec*ec);
+    // Project from amygdala centroid outward to find the nearest point on the
+    // actual mesh scalp surface. The old ellipsoidal model (semi-axes 78,95,85)
+    // placed the source ~26mm INSIDE the head on this mesh.
+    //
+    // Strategy: collect all external scalp boundary face centroids, then find
+    // the one nearest to the radial projection from the amygdala center.
 
-    float target_x = t_scalp * amyg_cx;   // ~76mm lateral
-    float target_y = t_scalp * amyg_cy;   // ~-6mm posterior  
-    float target_z = t_scalp * amyg_cz;   // ~-57mm inferior (BELOW amygdala)
+    // Collect external scalp face centroids + normals
+    struct ScalpFace { float x, y, z, nx, ny, nz; };
+    std::vector<ScalpFace> ext_faces;
+    static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
 
-    printf("  Ellipsoidal target: (%.1f, %.1f, %.1f) mm\n",
-           target_x, target_y, target_z);
+    for (int e = 0; e < mesh.num_elements; e++) {
+        if (mesh.tissue[e] != TISSUE_SCALP) continue;
+        for (int f = 0; f < 4; f++) {
+            if (mesh.neighbors[e * 4 + f] != -1) continue;
+            ScalpFace sf;
+            sf.x = sf.y = sf.z = 0;
+            for (int i = 0; i < 3; i++) {
+                int vi = mesh.elements[e * 4 + FV[f][i]];
+                sf.x += mesh.nodes[vi * 3 + 0];
+                sf.y += mesh.nodes[vi * 3 + 1];
+                sf.z += mesh.nodes[vi * 3 + 2];
+            }
+            sf.x /= 3; sf.y /= 3; sf.z /= 3;
+            int va = mesh.elements[e * 4 + FV[f][0]];
+            int vb = mesh.elements[e * 4 + FV[f][1]];
+            int vc = mesh.elements[e * 4 + FV[f][2]];
+            float e1x = mesh.nodes[vb*3+0]-mesh.nodes[va*3+0];
+            float e1y = mesh.nodes[vb*3+1]-mesh.nodes[va*3+1];
+            float e1z = mesh.nodes[vb*3+2]-mesh.nodes[va*3+2];
+            float e2x = mesh.nodes[vc*3+0]-mesh.nodes[va*3+0];
+            float e2y = mesh.nodes[vc*3+1]-mesh.nodes[va*3+1];
+            float e2z = mesh.nodes[vc*3+2]-mesh.nodes[va*3+2];
+            sf.nx = e1y*e2z - e1z*e2y;
+            sf.ny = e1z*e2x - e1x*e2z;
+            sf.nz = e1x*e2y - e1y*e2x;
+            float nm = sqrtf(sf.nx*sf.nx + sf.ny*sf.ny + sf.nz*sf.nz);
+            if (nm > 0) { sf.nx /= nm; sf.ny /= nm; sf.nz /= nm; }
+            ext_faces.push_back(sf);
+        }
+    }
+    printf("  Found %d external scalp boundary faces\n", (int)ext_faces.size());
 
-    // Use ellipsoidal target directly as source (0.5mm inward from surface)
-    // Surface normal: radial from head center (origin at AC)
-    float nmag = sqrtf(target_x*target_x + target_y*target_y + target_z*target_z);
-    float best_nx = target_x / nmag;
-    float best_ny = target_y / nmag;
-    float best_nz = target_z / nmag;
+    // Direction from origin through amygdala center (radial projection)
+    float dir_x = amyg_cx, dir_y = amyg_cy, dir_z = amyg_cz;
+    float dir_mag = sqrtf(dir_x*dir_x + dir_y*dir_y + dir_z*dir_z);
+    dir_x /= dir_mag; dir_y /= dir_mag; dir_z /= dir_mag;
 
-    // Place source just inside the scalp (0.5mm inward toward head center)
-    src_x = target_x - best_nx * 0.5f;
-    src_y = target_y - best_ny * 0.5f;
-    src_z = target_z - best_nz * 0.5f;
+    // Find the external scalp face whose centroid is closest to the ray
+    // from origin in the amygdala direction. Use projection distance.
+    float best_d2 = 1e30f;
+    int best_idx = -1;
+    for (int j = 0; j < (int)ext_faces.size(); j++) {
+        // Project face centroid onto the ray from origin
+        float dot = ext_faces[j].x * dir_x + ext_faces[j].y * dir_y + ext_faces[j].z * dir_z;
+        if (dot < 0) continue; // behind origin
+        // Perpendicular distance to ray
+        float px = ext_faces[j].x - dot * dir_x;
+        float py = ext_faces[j].y - dot * dir_y;
+        float pz = ext_faces[j].z - dot * dir_z;
+        float d2 = px*px + py*py + pz*pz;
+        if (d2 < best_d2) { best_d2 = d2; best_idx = j; }
+    }
 
-    // Direction: inward (toward head center/amygdala)
-    src_dx = -best_nx;
-    src_dy = -best_ny;
-    src_dz = -best_nz;
+    if (best_idx < 0) {
+        fprintf(stderr, "ERROR: no external scalp face found in amygdala direction!\n");
+        src_x = amyg_cx; src_y = amyg_cy; src_z = amyg_cz;
+        src_dx = -dir_x; src_dy = -dir_y; src_dz = -dir_z;
+        return;
+    }
 
-    float dist_to_amyg = sqrtf((target_x-amyg_cx)*(target_x-amyg_cx) +
-                               (target_y-amyg_cy)*(target_y-amyg_cy) +
-                               (target_z-amyg_cz)*(target_z-amyg_cz));
+    float surf_x = ext_faces[best_idx].x;
+    float surf_y = ext_faces[best_idx].y;
+    float surf_z = ext_faces[best_idx].z;
+    float surf_nx = ext_faces[best_idx].nx;
+    float surf_ny = ext_faces[best_idx].ny;
+    float surf_nz = ext_faces[best_idx].nz;
+
+    // Ensure normal points outward (away from head center)
+    float dot_out = surf_nx * surf_x + surf_ny * surf_y + surf_nz * surf_z;
+    if (dot_out < 0) { surf_nx = -surf_nx; surf_ny = -surf_ny; surf_nz = -surf_nz; }
+
+    printf("  Scalp surface point: (%.1f, %.1f, %.1f) mm\n", surf_x, surf_y, surf_z);
+    printf("  Surface normal: (%.3f, %.3f, %.3f)\n", surf_nx, surf_ny, surf_nz);
+
+    // Place source 0.5mm inward from the actual scalp surface
+    src_x = surf_x - surf_nx * 0.5f;
+    src_y = surf_y - surf_ny * 0.5f;
+    src_z = surf_z - surf_nz * 0.5f;
+
+    // Direction: inward (opposite to surface normal)
+    src_dx = -surf_nx;
+    src_dy = -surf_ny;
+    src_dz = -surf_nz;
+
+    float dist_to_amyg = sqrtf((surf_x-amyg_cx)*(surf_x-amyg_cx) +
+                               (surf_y-amyg_cy)*(surf_y-amyg_cy) +
+                               (surf_z-amyg_cz)*(surf_z-amyg_cz));
     printf("  Source position: (%.1f, %.1f, %.1f) mm\n", src_x, src_y, src_z);
     printf("  Source direction: (%.3f, %.3f, %.3f)\n", src_dx, src_dy, src_dz);
     printf("  Distance to amygdala: %.1f mm\n", dist_to_amyg);
@@ -291,25 +355,39 @@ static std::vector<Detector> build_mmc_detectors(
         float angle_deg = target_angles[i];
         float angle_rad = angle_deg * 3.14159265f / 180.0f;
 
-        // Target point on scalp at given SDS and angle
         // Direction on scalp surface = cos(angle)*tangent + sin(angle)*bitangent
         float dx_scalp = cosf(angle_rad) * tx + sinf(angle_rad) * bx;
         float dy_scalp = cosf(angle_rad) * ty + sinf(angle_rad) * by;
         float dz_scalp = cosf(angle_rad) * tz + sinf(angle_rad) * bz;
 
-        float target_x = src_x + dx_scalp * sds;
-        float target_y = src_y + dy_scalp * sds;
-        float target_z = src_z + dz_scalp * sds;
-
-        // Find nearest scalp surface point
-        float best_d2 = 1e30f;
+        // Iterative SDS placement: step along tangent, snap to surface, correct
+        // This handles surface curvature that causes straight-line projection to miss
+        float scale = sds;
         int best_idx = -1;
-        for (int j = 0; j < (int)scalp_pts.size(); j++) {
-            float ddx = scalp_pts[j].x - target_x;
-            float ddy = scalp_pts[j].y - target_y;
-            float ddz = scalp_pts[j].z - target_z;
-            float d2 = ddx*ddx + ddy*ddy + ddz*ddz;
-            if (d2 < best_d2) { best_d2 = d2; best_idx = j; }
+        float actual_sds = 0;
+        for (int iter = 0; iter < 10; iter++) {
+            float target_x = src_x + dx_scalp * scale;
+            float target_y = src_y + dy_scalp * scale;
+            float target_z = src_z + dz_scalp * scale;
+
+            float best_d2 = 1e30f;
+            best_idx = -1;
+            for (int j = 0; j < (int)scalp_pts.size(); j++) {
+                float ddx = scalp_pts[j].x - target_x;
+                float ddy = scalp_pts[j].y - target_y;
+                float ddz = scalp_pts[j].z - target_z;
+                float d2 = ddx*ddx + ddy*ddy + ddz*ddz;
+                if (d2 < best_d2) { best_d2 = d2; best_idx = j; }
+            }
+            if (best_idx < 0) break;
+
+            actual_sds = sqrtf(
+                (scalp_pts[best_idx].x-src_x)*(scalp_pts[best_idx].x-src_x) +
+                (scalp_pts[best_idx].y-src_y)*(scalp_pts[best_idx].y-src_y) +
+                (scalp_pts[best_idx].z-src_z)*(scalp_pts[best_idx].z-src_z));
+
+            if (fabsf(actual_sds - sds) < 1.0f) break; // within 1mm tolerance
+            if (actual_sds > 0.1f) scale *= sds / actual_sds;
         }
 
         if (best_idx < 0) continue;
@@ -324,27 +402,20 @@ static std::vector<Detector> build_mmc_detectors(
         det.ny = scalp_pts[best_idx].ny;
         det.nz = scalp_pts[best_idx].nz;
 
-        // Ensure normal points outward (away from mesh interior)
-        float to_src_x = src_x - det.x;
-        float to_src_y = src_y - det.y;
-        float to_src_z = src_z - det.z;
-        float dot_src = det.nx*to_src_x + det.ny*to_src_y + det.nz*to_src_z;
-        // source is inside, so if dot > 0, normal points inward → flip
-        if (dot_src > 0) {
+        // Ensure normal points outward (away from head center)
+        float dot_out = det.nx*det.x + det.ny*det.y + det.nz*det.z;
+        if (dot_out < 0) {
             det.nx = -det.nx; det.ny = -det.ny; det.nz = -det.nz;
         }
 
         det.n_critical = 1.0f / 1.37f; // n_air / n_scalp
 
         dets.push_back(det);
-
-        // Actual SDS on surface
-        float actual_sds = sqrtf(
-            (det.x-src_x)*(det.x-src_x) +
-            (det.y-src_y)*(det.y-src_y) +
-            (det.z-src_z)*(det.z-src_z));
         out_separations.push_back(actual_sds);
         out_angles.push_back(angle_deg);
+
+        printf("    Det %2d: target=%5.0fmm actual=%5.1fmm angle=%+4.0f pos=(%.1f,%.1f,%.1f)\n",
+               det.id, sds, actual_sds, angle_deg, det.x, det.y, det.z);
     }
 
     printf("  Built %d detectors on scalp surface\n", (int)dets.size());
