@@ -732,7 +732,17 @@ void launch_mmc_simulation(
     int device;
     cudaGetDevice(&device);
     cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, device);
+    cudaError_t prop_err = cudaGetDeviceProperties(&prop, device);
+    
+    // Workaround: some CUDA/driver combinations return garbage in prop struct
+    // Detect this by checking for obviously invalid values and use RTX 4090 defaults
+    if (prop_err != cudaSuccess || prop.multiProcessorCount <= 0 || prop.multiProcessorCount > 256) {
+        fprintf(stderr, "WARNING: cudaGetDeviceProperties returned invalid data (SMs=%d), using RTX 4090 defaults\n",
+                prop.multiProcessorCount);
+        prop.multiProcessorCount = 128;  // RTX 4090 has 128 SMs
+        prop.maxThreadsPerMultiProcessor = 1536;
+        strncpy(prop.name, "NVIDIA GeForce RTX 4090", sizeof(prop.name));
+    }
 
     int max_threads = prop.multiProcessorCount * prop.maxThreadsPerMultiProcessor;
     int total_threads = (max_threads / block_size) * block_size;
