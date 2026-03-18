@@ -388,8 +388,8 @@ def mbll_multi_channel(results):
             g1 = det1["time_gates"][g_idx]
             L0 = g0.get("partial_pathlength_mm", {}).get("amygdala", 0)
             L1 = g1.get("partial_pathlength_mm", {}).get("amygdala", 0)
-            # Minimum amygdala pathlength threshold: 0.01 mm
-            if L0 <= 0.01 or L1 <= 0.01:
+            # Minimum amygdala pathlength threshold: 0.001 mm (based on 10B photon results)
+            if L0 <= 0.001 or L1 <= 0.001:
                 continue
 
             gw0 = g0.get("weight", 0)
