@@ -290,3 +290,4 @@ python3 validate_td_gated.py data_mmc_100M --wavelength 730
 | 2026-03-17 | RTX 4090 smoke test: 0.7 Mph/s confirmed. 10B run estimated ~8 hr (~$3.20) |
 | 2026-03-17 | Full kernel audit: memory-latency-limited (random tet traversal), 15-40% warp divergence. Fix E (return normals from ray_tet_exit) identified as optional. Production run not blocked. |
 | 2026-03-17 | **DEBUGGED**: face_pair kernel hang on RTX 4090 - added safety checks (entry_face validation, boundary crossing limit) |
+| 2026-03-17 | **VERIFIED**: Safety fixes work - 1M photon test passes on RTX 4090. Ready for 10B production run |
