@@ -120,6 +120,12 @@ def build_tissue_labels(t1, gm, wm, csf, brain_mask, voxel_size_mm=1.0):
     Create an integer label volume from probabilistic maps.
     Priority (innermost wins): amygdala > WM > GM > CSF > skull > scalp > air
 
+    WARNING: This function has known issues:
+    1. Scalp fills entire head volume (73% of mesh) - should be thin shell
+    2. Amygdala placement uses wrong coordinate transform
+
+    Use build_tissue_labels_fixed() for corrected implementation.
+
     Returns:
         labels: np.uint8 array of TissueType values
         affine: mapping from voxel indices to MNI mm
@@ -199,8 +205,81 @@ def build_tissue_labels(t1, gm, wm, csf, brain_mask, voxel_size_mm=1.0):
     return labels
 
 
+def build_tissue_labels_fixed(t1, gm, wm, csf, brain_mask, affine, scalp_thickness_mm=7.0):
+    """
+    FIXED version: Create tissue label volume with anatomically correct scalp.
+    
+    Key fixes:
+    1. Scalp is a thin shell (~7mm) around skull, not entire head volume
+    2. No amygdala placement (handled separately with proper affine)
+    
+    Algorithm:
+    1. Build brain mask from GM + WM
+    2. Build skull by dilating brain (excludes scalp region)
+    3. Build scalp as thin shell: dilated_skull - skull
+    4. Everything outside dilated_skull = AIR
+    5. Inner tissues: CSF, GM, WM (no amygdala here)
+    
+    Returns:
+        labels: np.uint8 array of TissueType values
+    """
+    shape = t1.shape
+    voxel_size_mm = float(np.abs(affine[0, 0]))
+    labels = np.zeros(shape, dtype=np.uint8)  # TISSUE_AIR = 0
+    
+    print(f"  Building tissue labels with fixed scalp (thickness={scalp_thickness_mm}mm)...")
+    
+    # Step 1: Brain mask (GM + WM)
+    brain = (gm > 0.5) | (wm > 0.5)
+    
+    # Step 2: Skull = dilated_brain - brain
+    # Skull thickness ~7mm (excluding scalp)
+    skull_thickness_vox = max(2, int(7.0 / voxel_size_mm))
+    brain_dilated_for_skull = ndimage.binary_dilation(brain, iterations=skull_thickness_vox)
+    skull_mask = brain_dilated_for_skull & ~brain
+    labels[skull_mask] = TISSUE_SKULL
+    
+    # Step 3: Scalp = dilated_skull - skull (thin shell)
+    # Scalp thickness ~7mm
+    scalp_thickness_vox = max(1, int(scalp_thickness_mm / voxel_size_mm))
+    skull_dilated_for_scalp = ndimage.binary_dilation(brain_dilated_for_skull, 
+                                                       iterations=scalp_thickness_vox)
+    scalp_mask = skull_dilated_for_scalp & ~brain_dilated_for_skull
+    labels[scalp_mask] = TISSUE_SCALP
+    
+    # Step 4: Inner tissues
+    # CSF
+    csf_mask = (csf > 0.3) & brain
+    labels[csf_mask] = TISSUE_CSF
+    
+    # Gray matter
+    gm_mask = (gm > 0.5) & brain
+    labels[gm_mask] = TISSUE_GRAY
+    
+    # White matter
+    wm_mask = (wm > 0.5) & brain
+    labels[wm_mask] = TISSUE_WHITE
+    
+    # Note: Amygdala is NOT placed here - it's handled separately with proper affine
+    
+    print(f"Tissue label summary (FIXED):")
+    tissue_names = ['air','scalp','skull','csf','gray','white','amygdala']
+    total_voxels = np.prod(shape)
+    for t, name in enumerate(tqdm(tissue_names, desc="  Counting voxels", leave=False)):
+        n = np.sum(labels == t)
+        pct = 100.0 * n / total_voxels
+        print(f"  {name}: {n:,} voxels ({pct:.1f}%)")
+    
+    return labels
+
+
 def build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine):
-    """Build tissue labels with proper MNI coordinate transform for amygdala."""
+    """
+    Build tissue labels with proper MNI coordinate transform for amygdala.
+    
+    DEPRECATED: Use build_tissue_labels_fixed_v2() for corrected implementation.
+    This function has the dual amygdala placement bug.
+    """
     shape = t1.shape
     voxel_size = float(np.abs(affine[0,0]))
     labels = build_tissue_labels(t1, gm, wm, csf, brain_mask, voxel_size)
@@ -234,6 +313,94 @@ def build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine):
 
     amyg_count = np.sum(labels == TISSUE_AMYGDALA)
     print(f"  amygdala (refined): {amyg_count:,} voxels")
+    return labels
+
+
+def build_tissue_labels_fixed_v2(t1, gm, wm, csf, brain_mask, affine, scalp_thickness_mm=7.0):
+    """
+    FIXED version v2: Correct scalp + correct amygdala placement.
+    
+    Fixes applied:
+    1. Scalp is thin shell (~7mm) around skull, not entire head volume
+    2. Amygdala placed once with proper affine (no dual placement bug)
+    3. Amygdala radius increased to 8mm for better anatomical coverage
+    
+    Returns:
+        labels: np.uint8 array of TissueType values
+    """
+    shape = t1.shape
+    voxel_size_mm = float(np.abs(affine[0, 0]))
+    labels = np.zeros(shape, dtype=np.uint8)  # TISSUE_AIR = 0
+    
+    print(f"  Building tissue labels (FIXED v2):")
+    print(f"    - Scalp thickness: {scalp_thickness_mm}mm")
+    print(f"    - Amygdala: using proper affine transform")
+    
+    # Step 1: Brain mask (GM + WM)
+    brain = (gm > 0.5) | (wm > 0.5)
+    
+    # Step 2: Skull = dilated_brain - brain
+    skull_thickness_vox = max(2, int(7.0 / voxel_size_mm))
+    brain_dilated_for_skull = ndimage.binary_dilation(brain, iterations=skull_thickness_vox)
+    skull_mask = brain_dilated_for_skull & ~brain
+    labels[skull_mask] = TISSUE_SKULL
+    
+    # Step 3: Scalp = dilated_skull - skull (thin shell)
+    scalp_thickness_vox = max(1, int(scalp_thickness_mm / voxel_size_mm))
+    skull_dilated_for_scalp = ndimage.binary_dilation(brain_dilated_for_skull, 
+                                                       iterations=scalp_thickness_vox)
+    scalp_mask = skull_dilated_for_scalp & ~brain_dilated_for_skull
+    labels[scalp_mask] = TISSUE_SCALP
+    
+    # Step 4: Inner tissues
+    # CSF
+    csf_mask = (csf > 0.3) & brain
+    labels[csf_mask] = TISSUE_CSF
+    
+    # Gray matter
+    gm_mask = (gm > 0.5) & brain
+    labels[gm_mask] = TISSUE_GRAY
+    
+    # White matter
+    wm_mask = (wm > 0.5) & brain
+    labels[wm_mask] = TISSUE_WHITE
+    
+    # Step 5: Amygdala with proper affine transform
+    # Using 8mm radius for better anatomical coverage (amygdala ~15x10mm)
+    try:
+        inv_affine = np.linalg.inv(affine)
+    except np.linalg.LinAlgError:
+        print("  WARNING: Could not invert affine, skipping amygdala placement")
+        inv_affine = None
+    
+    if inv_affine is not None:
+        amyg_centers_mni = np.array([
+            [24., -2., -20., 1.],
+            [-24., -2., -20., 1.],
+        ], dtype=np.float64)
+        amyg_radius_mm = 8.0  # Increased from 6.5mm for better coverage
+        
+        ii, jj, kk = np.indices(shape)
+        
+        for center_hom in tqdm(amyg_centers_mni, desc="  Placing amygdala", leave=False):
+            center_vox = inv_affine @ center_hom
+            ci, cj, ck = center_vox[:3]
+            di = (ii - ci) * voxel_size_mm
+            dj = (jj - cj) * voxel_size_mm
+            dk = (kk - ck) * voxel_size_mm
+            sphere = (di**2 + dj**2 + dk**2) <= amyg_radius_mm**2
+            # Amygdala is deep brain structure
+            labels[sphere & brain] = TISSUE_AMYGDALA
+    
+    # Print summary
+    print(f"Tissue label summary (FIXED v2):")
+    tissue_names = ['air','scalp','skull','csf','gray','white','amygdala']
+    total_voxels = np.prod(shape)
+    for t, name in enumerate(tqdm(tissue_names, desc="  Counting voxels", leave=False)):
+        n = np.sum(labels == t)
+        pct = 100.0 * n / total_voxels
+        print(f"  {name}: {n:,} voxels ({pct:.1f}%)")
+    
     return labels
 
 
@@ -764,7 +931,7 @@ def generate_mni152_mesh(output_path, max_vol=1.0, min_dihedral=15.0,
         else:
             print("\n[2/7] Building tissue label volume...")
             with tqdm(total=1, desc="  Segmenting tissues", bar_format='{l_bar}{bar}| {elapsed}') as pbar:
-                labels = build_tissue_labels_with_affine(t1, gm, wm, csf, brain_mask, affine)
+                labels = build_tissue_labels_fixed_v2(t1, gm, wm, csf, brain_mask, affine)
                 pbar.update(1)
             save_checkpoint(checkpoint_dir, step, labels)
     else:
