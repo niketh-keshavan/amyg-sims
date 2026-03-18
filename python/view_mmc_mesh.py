@@ -13,6 +13,7 @@ The viewer runs locally in your browser - no server needed.
 
 import struct
 import argparse
+import json
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
@@ -358,10 +359,10 @@ def create_mesh_viewer(mesh_path, output_file, max_tets=50000):
     # Load mesh
     nodes, elements, tissues = load_mmcmesh(mesh_path, max_tets)
     
-    # Convert to JSON-serializable format
-    nodes_json = str(nodes).replace(' ', '')
-    elements_json = str(elements).replace(' ', '')
-    tissues_json = str(list(tissues)).replace(' ', '')
+    # Convert to JSON format for JavaScript
+    nodes_json = json.dumps(nodes)
+    elements_json = json.dumps(elements)
+    tissues_json = json.dumps(list(tissues))
     
     # Generate HTML
     html = HTML_TEMPLATE.format(
