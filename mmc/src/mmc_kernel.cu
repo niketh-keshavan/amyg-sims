@@ -741,7 +741,7 @@ void launch_mmc_simulation(
 
     uint64_t threads_total = (uint64_t)num_blocks * block_size;
 
-    int num_batches = 20;
+    int num_batches = 200;
     uint64_t photons_per_batch = (config.num_photons + num_batches - 1) / num_batches;
     uint64_t photons_per_thread_per_batch =
         (photons_per_batch + threads_total - 1) / threads_total;
