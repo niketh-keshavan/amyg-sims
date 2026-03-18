@@ -20,13 +20,13 @@ set(CURAND_LINK $<IF:$<TARGET_EXISTS:CUDA::curand>,CUDA::curand,${CURAND_LIB}>)
 
 # ── Voxel-based MC (original) ──────────────────────────────────────────────
 add_executable(mc_fnirs
-    src/main.cu
-    src/mc_kernel.cu
-    src/geometry.cu
-    src/detector.cu
-    src/optical_properties.cu
+    src/voxel/main.cu
+    src/voxel/mc_kernel.cu
+    src/voxel/geometry.cu
+    src/voxel/detector.cu
+    src/voxel/optical_properties.cu
 )
-target_include_directories(mc_fnirs PRIVATE include)
+target_include_directories(mc_fnirs PRIVATE include/voxel)
 if(TARGET CUDA::curand)
     target_link_libraries(mc_fnirs PRIVATE CUDA::curand)
 elseif(CURAND_LIB)
@@ -40,9 +40,9 @@ target_compile_options(mc_fnirs PRIVATE
 
 # ── 3D Model Exporter ─────────────────────────────────────────────────────
 add_executable(export_3d_model
-    src/export_3d_model.cu
+    src/voxel/export_3d_model.cu
 )
-target_include_directories(export_3d_model PRIVATE include)
+target_include_directories(export_3d_model PRIVATE include/voxel)
 target_link_libraries(export_3d_model PRIVATE CUDA::cudart)
 target_compile_options(export_3d_model PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3>
