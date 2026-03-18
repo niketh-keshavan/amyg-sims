@@ -25,6 +25,7 @@ struct MeshData {
     // Precomputed per-face geometry (M*4 faces)
     float* face_normals;   // [M*4*3] outward unit normal per face
     float* face_d;         // [M*4]   plane constant: dot(normal, vertex_on_face)
+    int*   face_pair;      // [M*4]   entry face in neighbor: face_pair[e*4+f] = face idx in neighbor
 
     int num_nodes;
     int num_elements;
@@ -77,6 +78,10 @@ void precompute_face_geometry(const HostMesh& mesh,
                               std::vector<float>& face_normals,
                               std::vector<float>& face_d);
 
+// Precompute entry-face lookup table for fast neighbor traversal
+// face_pair[e*4+f] = face index in neighbor that points back to e
+void precompute_face_pair(const HostMesh& mesh, std::vector<int>& face_pair);
+
 // Build uniform grid accelerator on host
 void build_grid_accelerator(const HostMesh& mesh,
                             std::vector<int>& grid_offsets,
@@ -88,6 +93,7 @@ void build_grid_accelerator(const HostMesh& mesh,
 MMCDeviceData upload_mesh_to_gpu(const HostMesh& mesh,
                                  const std::vector<float>& face_normals,
                                  const std::vector<float>& face_d,
+                                 const std::vector<int>& face_pair,
                                  const std::vector<int>& grid_offsets,
                                  const std::vector<int>& grid_counts,
                                  const std::vector<int>& grid_tets,

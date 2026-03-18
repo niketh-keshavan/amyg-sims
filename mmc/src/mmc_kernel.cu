@@ -281,66 +281,37 @@ __device__ int find_enclosing_tet(float px, float py, float pz,
 
 // ---------------------------------------------------------------------------
 // Ray-tetrahedron exit: find which face the ray exits through
-// Uses Möller-Trumbore intersection test on each face triangle.
-// Returns exit distance and face index. Skips the entry face.
+// Uses precomputed face plane equations (normal + plane constant).
+// For a convex tet with ray starting inside, the exit face is the one
+// with the smallest positive ray-plane intersection distance.
 // ---------------------------------------------------------------------------
-
-// Face vertex indices (face k is opposite vertex k)
-__constant__ int FACE_VERTS_DEV[4][3] = {
-    {1, 2, 3},
-    {0, 2, 3},
-    {0, 1, 3},
-    {0, 1, 2}
-};
-
 __device__ float ray_tet_exit(float px, float py, float pz,
                               float dx, float dy, float dz,
                               int tet_id, int entry_face,
-                              const float* __restrict__ nodes,
-                              const int* __restrict__ elements,
+                              const float* __restrict__ face_normals,
+                              const float* __restrict__ face_d,
                               int* exit_face) {
     float min_t = 1e30f;
     *exit_face = -1;
 
-    const int* elem = &elements[tet_id * 4];
+    int base = tet_id * 4;
 
     for (int f = 0; f < 4; f++) {
         if (f == entry_face) continue;
 
-        int va = elem[FACE_VERTS_DEV[f][0]];
-        int vb = elem[FACE_VERTS_DEV[f][1]];
-        int vc = elem[FACE_VERTS_DEV[f][2]];
+        int idx = base + f;
+        float nx = face_normals[idx * 3 + 0];
+        float ny = face_normals[idx * 3 + 1];
+        float nz = face_normals[idx * 3 + 2];
 
-        // Möller-Trumbore ray-triangle intersection
-        float v0x = nodes[va*3+0], v0y = nodes[va*3+1], v0z = nodes[va*3+2];
-        float e1x = nodes[vb*3+0]-v0x, e1y = nodes[vb*3+1]-v0y, e1z = nodes[vb*3+2]-v0z;
-        float e2x = nodes[vc*3+0]-v0x, e2y = nodes[vc*3+1]-v0y, e2z = nodes[vc*3+2]-v0z;
+        // dot(normal, dir): positive means ray heading outward through this face
+        float denom = nx * dx + ny * dy + nz * dz;
+        if (denom < 1e-12f) continue;
 
-        // h = cross(dir, e2)
-        float hx = dy*e2z - dz*e2y;
-        float hy = dz*e2x - dx*e2z;
-        float hz = dx*e2y - dy*e2x;
+        // distance from point to face plane
+        float numer = face_d[idx] - (nx * px + ny * py + nz * pz);
+        float t = numer / denom;
 
-        float a = e1x*hx + e1y*hy + e1z*hz;
-        if (fabsf(a) < 1e-12f) continue; // parallel
-
-        float inv_a = 1.0f / a;
-
-        // s = p - v0
-        float sx = px - v0x, sy = py - v0y, sz = pz - v0z;
-
-        float u = inv_a * (sx*hx + sy*hy + sz*hz);
-        if (u < -1e-6f || u > 1.0f + 1e-6f) continue;
-
-        // q = cross(s, e1)
-        float qx = sy*e1z - sz*e1y;
-        float qy = sz*e1x - sx*e1z;
-        float qz = sx*e1y - sy*e1x;
-
-        float v = inv_a * (dx*qx + dy*qy + dz*qz);
-        if (v < -1e-6f || u + v > 1.0f + 1e-6f) continue;
-
-        float t = inv_a * (e2x*qx + e2y*qy + e2z*qz);
         if (t > 1e-8f && t < min_t) {
             min_t = t;
             *exit_face = f;
@@ -361,6 +332,7 @@ __global__ void mmc_kernel(
     const int*   __restrict__ neighbors,
     const float* __restrict__ face_normals,
     const float* __restrict__ face_d,
+    const int*   __restrict__ face_pair,
     int num_elements,
     // Grid accelerator
     const int*   __restrict__ grid_offsets,
@@ -475,7 +447,7 @@ __global__ void mmc_kernel(
                 int exit_face;
                 float d_exit = ray_tet_exit(px, py, pz, ddx, ddy, ddz,
                                             current_tet, entry_face,
-                                            nodes, elements, &exit_face);
+                                            face_normals, face_d, &exit_face);
 
                 if (exit_face < 0) {
                     // Degenerate tet or numerical issue — terminate photon
@@ -639,14 +611,8 @@ __global__ void mmc_kernel(
 
                 // Cross into neighbor
                 // The entry face in the neighbor is the face shared with current_tet
-                // Find which face of neighbor corresponds to current_tet
-                int new_entry_face = -1;
-                for (int f = 0; f < 4; f++) {
-                    if (neighbors[neighbor * 4 + f] == current_tet) {
-                        new_entry_face = f;
-                        break;
-                    }
-                }
+                // Use precomputed face_pair for O(1) lookup (Fix B)
+                int new_entry_face = face_pair[current_tet * 4 + exit_face];
 
                 current_tet = neighbor;
                 entry_face = new_entry_face;
@@ -783,7 +749,7 @@ void launch_mmc_simulation(
 
         mmc_kernel<<<num_blocks, block_size>>>(
             dev.mesh.nodes, dev.mesh.elements, dev.mesh.tissue,
-            dev.mesh.neighbors, dev.mesh.face_normals, dev.mesh.face_d,
+            dev.mesh.neighbors, dev.mesh.face_normals, dev.mesh.face_d, dev.mesh.face_pair,
             dev.mesh.num_elements,
             dev.grid.offsets, dev.grid.counts, dev.grid.tets,
             dev.grid.bbox_min[0], dev.grid.bbox_min[1], dev.grid.bbox_min[2],

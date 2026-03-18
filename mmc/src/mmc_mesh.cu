@@ -156,6 +156,36 @@ void precompute_face_geometry(const HostMesh& mesh,
 }
 
 // ---------------------------------------------------------------------------
+// Precompute entry-face lookup table for fast neighbor entry-face lookup
+// face_pair[e*4+f] = the face index in neighbors[e*4+f] that maps back to e
+// ---------------------------------------------------------------------------
+void precompute_face_pair(const HostMesh& mesh, std::vector<int>& face_pair) {
+    int M = mesh.num_elements;
+    face_pair.resize(M * 4);
+    
+    for (int e = 0; e < M; e++) {
+        for (int f = 0; f < 4; f++) {
+            int neighbor = mesh.neighbors[e * 4 + f];
+            if (neighbor >= 0) {
+                // Find which face of the neighbor points back to e
+                int entry_face = -1;
+                for (int nf = 0; nf < 4; nf++) {
+                    if (mesh.neighbors[neighbor * 4 + nf] == e) {
+                        entry_face = nf;
+                        break;
+                    }
+                }
+                face_pair[e * 4 + f] = entry_face;
+            } else {
+                face_pair[e * 4 + f] = -1;  // boundary face
+            }
+        }
+    }
+    
+    printf("  Precomputed %d face pairs\n", M * 4);
+}
+
+// ---------------------------------------------------------------------------
 // Uniform grid accelerator for point-in-tet queries
 // ---------------------------------------------------------------------------
 void build_grid_accelerator(const HostMesh& mesh,
@@ -254,6 +284,7 @@ static void* gpu_alloc_copy(const void* src, size_t bytes) {
 MMCDeviceData upload_mesh_to_gpu(const HostMesh& mesh,
                                  const std::vector<float>& face_normals,
                                  const std::vector<float>& face_d,
+                                 const std::vector<int>& face_pair,
                                  const std::vector<int>& grid_offsets,
                                  const std::vector<int>& grid_counts,
                                  const std::vector<int>& grid_tets,
@@ -271,6 +302,7 @@ MMCDeviceData upload_mesh_to_gpu(const HostMesh& mesh,
     dev.mesh.neighbors    = (int*)  gpu_alloc_copy(mesh.neighbors.data(), M*4*sizeof(int));
     dev.mesh.face_normals = (float*)gpu_alloc_copy(face_normals.data(),   M*4*3*sizeof(float));
     dev.mesh.face_d       = (float*)gpu_alloc_copy(face_d.data(),         M*4*sizeof(float));
+    dev.mesh.face_pair    = (int*)  gpu_alloc_copy(face_pair.data(),      M*4*sizeof(int));
     dev.mesh.num_nodes    = N;
     dev.mesh.num_elements = M;
     memcpy(dev.mesh.bbox_min, mesh.bbox_min, 3*sizeof(float));
@@ -288,7 +320,7 @@ MMCDeviceData upload_mesh_to_gpu(const HostMesh& mesh,
         dev.grid.bbox_min[d] = mesh.bbox_min[d] - 0.1f;
 
     size_t total_bytes = (size_t)N*3*4 + (size_t)M*4*4 + (size_t)M*4 + (size_t)M*4*4
-                       + (size_t)M*4*3*4 + (size_t)M*4*4
+                       + (size_t)M*4*3*4 + (size_t)M*4*4 + (size_t)M*4*4
                        + GRID_CELLS*4*2 + (size_t)total*4;
     printf("  Uploaded to GPU: %.1f MB\n", total_bytes / 1e6);
 
@@ -305,6 +337,7 @@ void free_mesh_gpu(MMCDeviceData& dev) {
     cudaFree(dev.mesh.neighbors);
     cudaFree(dev.mesh.face_normals);
     cudaFree(dev.mesh.face_d);
+    cudaFree(dev.mesh.face_pair);
     cudaFree(dev.grid.offsets);
     cudaFree(dev.grid.counts);
     cudaFree(dev.grid.tets);

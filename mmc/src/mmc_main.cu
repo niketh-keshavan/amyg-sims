@@ -415,6 +415,10 @@ int main(int argc, char** argv) {
     printf("\n--- Precomputing face geometry ---\n");
     std::vector<float> face_normals, face_d;
     precompute_face_geometry(mesh, face_normals, face_d);
+    
+    // Precompute face pair lookup table (Fix B)
+    std::vector<int> face_pair;
+    precompute_face_pair(mesh, face_pair);
 
     // Build grid accelerator
     printf("\n--- Building spatial accelerator ---\n");
@@ -430,7 +434,7 @@ int main(int argc, char** argv) {
            free_mem / (1024.0*1024.0), total_mem / (1024.0*1024.0));
 
     MMCDeviceData dev_data = upload_mesh_to_gpu(
-        mesh, face_normals, face_d,
+        mesh, face_normals, face_d, face_pair,
         grid_offsets, grid_counts, grid_tets, cell_size);
 
     // Find source position on scalp
