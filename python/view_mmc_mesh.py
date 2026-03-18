@@ -167,12 +167,14 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
                 
                 // Helper to add triangle with normal
                 function addTriangle(a, b, c) {{
-                    vertices.push(...a, ...b, ...c);
+                    vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
                     const normal = new THREE.Vector3();
                     const ab = new THREE.Vector3().subVectors(b, a);
                     const ac = new THREE.Vector3().subVectors(c, a);
                     normal.crossVectors(ab, ac).normalize();
-                    normals.push(...normal, ...normal, ...normal);
+                    normals.push(normal.x, normal.y, normal.z);
+                    normals.push(normal.x, normal.y, normal.z);
+                    normals.push(normal.x, normal.y, normal.z);
                 }}
                 
                 // 4 faces of tetrahedron
