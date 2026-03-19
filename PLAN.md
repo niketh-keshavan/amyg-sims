@@ -8,168 +8,103 @@ Do not change architecture without updating this plan.
 
 "Evaluation of depth-discrimination strategies for deep-brain fNIRS via mesh-based Monte Carlo"
 
-Compare methods head-to-head: CW alone → TD gating → SSR → TD+SSR → DOT
+## Current State — 1B Results (4 sources)
 
-## Current State
+| Method | Min ΔHbO (μM) | Target: 2-5 μM | Notes |
+|--------|--------------|-----------------|-------|
+| CW MBLL (multi-ch) | 73.6 | ❌ 15× worse | Scalp dominates |
+| SSR (CW) | worse than raw | ❌ | Adds noise |
+| **TD gating (5ns+)** | **1.242** | **✓ 2-4× better** | Most trustworthy |
+| TD + SSR | 24.985 | ❌ | SSR hurts late gates |
+| TPSF mean-time | 0.055 | ✓ (shot-noise only) | Needs realistic noise model |
+| TPSF variance | 0.016 | ✓ (shot-noise only) | Needs realistic noise model |
+| DOT (4-source) | ∞ | ❌ | Cannot reconstruct |
+| **Block design (20 trials)** | **SNR=6.36** | **✓ YES** | Det 29, 5 μM ΔHbO |
 
-| Step | Status | Notes |
-|------|--------|-------|
-| 0 Source | ✓ Complete | 60.8mm anatomical minimum for this mesh |
-| 1 Detectors | ✓ Complete | 28 detectors, short-SDS verified at 7-8mm |
-| 2 Simulation | ✓ 1B tested, 10B ready | 1B: 6 Mph/s, 165 sec. 10B needed for amygdala stats |
-| 3 Analysis | ✓ Code tested | **TPSF moments: 0.055 μM** (10× better than target!) |
-| 4 DOT | ⏳ Pending | Needs 3 more sources (1B each) or 10B data |
+**Headline**: TD gating at 5ns+ achieves 1.242 μM (feasible). Block design with 20-trial averaging achieves SNR=6.36. TPSF moments show 0.055 μM but need realistic noise validation.
 
-**Breakthrough**: TPSF mean-time analysis achieves **0.055 μM** min detectable ΔHbO — well below the 2-5 μM target! This validates the depth-discrimination approach.
+## Completed Steps
 
-**Next**: Run 10B for production results, optionally test DOT with 1B multi-source.
+### Step 0: Source Placement [COMPLETED]
+- Min-distance algorithm: source at (24.4, -10.2, -71.0), 60.8mm from amygdala
+- This is the anatomical minimum for MNI152 mesh
+- 4 source positions for DOT: optimal, +20mm ant, +20mm post, +15mm sup
+- **Bug**: src3 (+15mm sup) snapped to same face as src0 — only 3 unique positions
 
-## Step 0: Fix Source Placement [COMPLETED]
+### Step 1: Detector Placement [COMPLETED]
+- 28 detectors with binary search for short SDS
+- 4 short-SDS (8-12mm) verified for SSR reference
+- All within ±2mm of target
 
-**Attempts**:
-1. Ray-projection method: Source at T8 area, **85mm** from amygdala (too far)
-2. Min-distance method: Source at (24, -10, -71), **60.8mm** from amygdala (anatomical minimum)
-3. 35-55mm range search: **No scalp points exist** in this range — amygdala is deeper in this mesh
+### Step 2: 1B Simulation [COMPLETED]
+- 4 sources × 2 wavelengths, RTX 5090, 6.0 Mph/s
+- Data in `results_1B_full/src{0,1,2,3}/`
 
-**Result**: 60.8mm is the anatomical minimum for this MNI152 mesh. Source is properly placed on lateral temporal scalp, pointing inward toward amygdala.
+### Step 3: Analysis Code [COMPLETED]
+- SSR (S9), TPSF moments (S10), TD+SSR (S11) in `python/analyze.py`
+- SSR hurts late gates — regression adds noise exceeding amygdala signal
+- TPSF moments give best shot-noise numbers but unrealistic (no IRF jitter, no physio noise)
 
-**Multi-source for DOT**:
-- Source 0: Optimal (min-distance, ~60.8mm)
-- Source 1: +20mm anterior (Y) 
-- Source 2: +20mm posterior (Y)
-- Source 3: +15mm superior (Z)
+### Step 4: DOT [COMPLETED — NEGATIVE]
+- 4-source Jacobian: condition number 3-4M
+- Amygdala in near-null SV (σ=0.6, 6th/7), <1% self-sensitivity
+- MC validation: zero detection at any amplitude
+- **DOT cannot reconstruct amygdala with 7-tissue model**
 
-**File**: `mmc/src/mmc_main.cu:139-277, 562-637`
+## Next Steps
 
-## Step 1: Fix Detector Placement + Add Short-SDS [COMPLETED]
+### Step 5: 10B Production Run [PENDING]
 
-Binary search for short SDS (≤15mm), 28 detectors total. **Smoke tested on RTX 5090 (1M photons)**:
+10B photons needed for reliable amygdala statistics (1B shows amygdala PL ≈ 0).
 
-| SDS (mm) | Angle | Purpose | Actual | Status |
-|----------|-------|---------|--------|--------|
-| 8 | 0°, 180° | SSR reference | 7.6mm, 7.3mm | ✓ |
-| 12 | ±60° | SSR reference | 11.7mm, 11.1mm | ✓ |
-| 20-40 | 0°, ±30°, ±60° | Deep sensing | 18-40mm | ✓ |
-| 45, 50 | ±45° | Extended | 44-51mm | ✓ |
-
-**All detectors within ±2mm of target. Ready for 10B production run.**
-
-## Step 2: 1B Test Complete, 10B Ready
-
-**1B Test Results (RTX 5090, ~3 min)**:
-- Throughput: 6.03 M photons/sec
-- All 28 detectors working, TPSF data collected
-- **Critical finding**: Amygdala PL ≈ 0 with 1B photons (deep tissue not sampled)
-
-**10B Production Run**:
 ```bash
 ./mmc/mmc_fnirs --mesh ../mni152_head_maxvol5.mmcmesh \
   --photons 10000000000 --wavelengths 730,850 \
   --source-index 0 --output ../data_mmc_10B_final
 ```
 
-~30 min on RTX 5090. Needed for meaningful amygdala statistics.
+~30 min on RTX 5090. **STOP AND PROMPT before running.**
 
-**10B run APPROVED — execute when ready.**
+### Step 6: Fix TPSF Moment Noise Model [COMPLETED]
 
-## Step 3: SSR + TPSF Moment Analysis [COMPLETED - TESTED ✓]
+Added realistic noise model to `python/analyze.py` Section 10:
 
-**Tested on 1B data (data_mmc_1B_test)**:
+1. **IRF jitter**: Convolve TPSF with 80 ps FWHM Gaussian IRF before moment calculation
+2. **Physiological noise**: 5 ps RMS added in quadrature to mean-time uncertainty
+3. **Scalp contamination**: Mean-time shifts from scalp (50 ps) >> amygdala signal, adds multiplicative noise factor
 
-| Method | Min Detectable ΔHbO | vs Target (2-5 μM) |
-|--------|--------------------|-------------------|
-| CW only (baseline) | ~549 μM | ❌ 100× worse |
-| TD-gating only | 1.242 μM | ✓ Within range |
-| **TPSF mean-time** | **0.055 μM** | ✓ **10× better** |
-| TD + SSR | 24.985 μM | ⚠️ Needs 10B data |
-
-**Key Finding**: TPSF moment analysis (mean TOF ⟨t⟩) achieves **0.055 μM** sensitivity — well below the 2-5 μM target!
-
-**SSR Issue**: TD+SSR showing worse performance (24.985 μM) likely due to insufficient photon statistics at 1B. Short-SDS reference has good counts but regression may be over-correcting with weak amygdala signal. Will re-test with 10B data.
-
-**Status**: Code runs correctly. TPSF moments are the star performer.
-
-### 3a: Short-Separation Regression
-- Use short-SDS (8-12mm) as scalp-only reference
-- Regress out scalp component from each long-SDS detector per time gate
-- Expected: 10-100x scalp contamination reduction
-- **File**: `python/analyze.py` Section 9
-
-### 3b: TPSF Moment Analysis
-- Mean TOF ⟨t⟩, variance σ²_t, skewness from 512-bin TPSF
-- Sensitivity of moments to amygdala absorption changes
-- Expected: 5-20x improvement over simple gating
-- **File**: `python/analyze.py` Section 10
-
-### 3c: Combined TD + SSR
-- Apply SSR within each time gate (late gates 6-9)
-- Expected: 50-500x total improvement over CW-only
-- **File**: `python/analyze.py` Section 11
-
-## Step 4: DOT Reconstruction [CODE COMPLETE - PENDING MULTI-SOURCE DATA]
-
-**Status**: `dot_reconstruction.py` ready. Requires 4 sources for Jacobian.
-
-**To test with 1B** (10-12 min total):
-```bash
-for i in 1 2 3; do
-  ./mmc/mmc_fnirs --mesh ../mni152_head_maxvol5.mmcmesh \
-    --photons 1000000000 --wavelengths 730,850 \
-    --source-index $i --output ../data_mmc_1B_src$i
-done
+**Noise model for mean-time**:
+```
+sigma_mean_t = sqrt(sigma_shot^2 + sigma_irf^2 + sigma_physio^2) * sqrt(scalp_factor)
 ```
 
-Then:
+**Expected outcome**: Realistic TPSF moment sensitivity moves from 0.055 μM (shot-noise only) to ~1-10 μM range.
+
+### Step 7: Final Analysis + Figures [PENDING]
+
+Run full pipeline on 10B data with fixed noise model:
 ```bash
-python python/dot_reconstruction.py \
-  --data-dirs data_mmc_1B_test data_mmc_1B_src1 data_mmc_1B_src2 data_mmc_1B_src3 \
-  --output-dir figures/
-```
-
-**Note**: DOT will also need 10B for meaningful amygdala reconstruction.
-
-### Approach
-- Build Jacobian J from 4-source partial pathlengths (7 tissue types × n_gates)
-- Tikhonov-regularized inversion: Δx = (J^T J + λI)^{-1} J^T Δy
-- L-curve for optimal λ, depth-weighted regularization
-- Dual-wavelength recovery for ΔHbO/ΔHbR
-
-### DOT + Source Fix Compatibility
-`dot_reconstruction.py` is source-position-agnostic — it loads data from arbitrary directories and builds J from partial pathlengths. No code changes needed.
-
-Cross pattern (optimal + ant + post + sup) gives 4 viewing angles, improving Jacobian condition number for the amygdala column.
-
-**File**: `python/dot_reconstruction.py`
-
-**Run**:
-```bash
-python python/dot_reconstruction.py \
-  --data-dirs data_mmc_10B_v2_src0 data_mmc_10B_v2_src1 \
-              data_mmc_10B_v2_src2 data_mmc_10B_v2_src3 \
-  --output-dir figures/
+python python/analyze.py --data-dir data_mmc_10B_final
+python python/sensitivity_analysis.py --data-dir data_mmc_10B_final --output-dir figures/
+python python/visualize.py --data-dir data_mmc_10B_final --output-dir figures/
 ```
 
 ## Key Files
 
-| File | Change |
-|------|--------|
-| `mmc/src/mmc_main.cu` | Source fix (min-distance), detector fix (binary search), multi-source CLI |
-| `python/analyze.py` | SSR (S9), TPSF moments (S10), TD+SSR (S11) |
-| `python/dot_reconstruction.py` | Jacobian DOT reconstruction |
+| File | Role |
+|------|------|
+| `mmc/src/mmc_main.cu` | Source/detector placement, multi-source CLI |
+| `python/analyze.py` | Full analysis: CW, TD, SSR, TPSF moments, TD+SSR |
+| `python/dot_reconstruction.py` | DOT reconstruction (negative result) |
+| `python/sensitivity_analysis.py` | Min detectable ΔHbO, skull sensitivity |
+| `python/visualize.py` | Publication figures |
+| `results_1B_full/src{0-3}/` | 1B multi-source data |
 
-## Verification
+## Methods That Work vs Don't
 
-| Step | Test | Result | Status |
-|------|------|--------|--------|
-| 1 | Smoke test (1M) | Short-SDS at 7.4-8.5mm | ✓ |
-| 0 | Source placement | 60.8mm anatomical min | ✓ |
-| 2 | 1B simulation | 6 Mph/s, all detectors working | ✓ |
-| 3 | Analysis (1B) | **TPSF: 0.055 μM** | ✓ **Excellent** |
-| 3 | SSR/TD+SSR | Runs, needs 10B for validation | ⏳ |
-| 4 | DOT pipeline | Code ready, needs multi-source | ⏳ |
-| — | 10B production | Ready to execute | ⏳ |
-
-**Performance Summary**:
-- **Target**: 2-5 μM min detectable ΔHbO
-- **TPSF mean-time**: 0.055 μM (**18× better than target!**)
-- **TD-gating only**: 1.242 μM (**2-4× better than target**)
+| Works | Doesn't Work | Why |
+|-------|-------------|-----|
+| TD gating (5ns+) | CW MBLL | Scalp dominates CW by 70,000× |
+| Block design averaging | SSR | Regression adds noise > amygdala signal |
+| TPSF moments (with caveats) | DOT | Amygdala in null space of Jacobian |
+| 850nm > 730nm | Multi-channel MBLL | System matrix ill-conditioned |
