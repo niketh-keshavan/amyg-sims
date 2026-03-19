@@ -124,18 +124,29 @@ def convolve_tpsf_with_irf(tpsf, fwhm_ps=100.0, bin_width_ps=10.0):
 
 def load_data(data_dir, apply_irf=True, irf_fwhm_ps=100.0):
     meta_path = data_dir / "volume_meta.json"
-    with open(meta_path) as f:
-        meta = json.load(f)
-    nx, ny, nz = meta["nx"], meta["ny"], meta["nz"]
+    mesh_meta_path = data_dir / "mesh_meta.json"
 
-    vol_path = data_dir / "volume.bin"
-    vol = np.fromfile(vol_path, dtype=np.uint8).reshape((nz, ny, nx)) if vol_path.exists() else None
+    if meta_path.exists():
+        with open(meta_path) as f:
+            meta = json.load(f)
+        nx, ny, nz = meta["nx"], meta["ny"], meta["nz"]
+    elif mesh_meta_path.exists():
+        with open(mesh_meta_path) as f:
+            meta = json.load(f)
+        nx, ny, nz = None, None, None
+    else:
+        raise FileNotFoundError(f"No volume_meta.json or mesh_meta.json in {data_dir}")
 
+    vol = None
     fluence = {}
-    for wl in WL_KEYS:
-        fp = data_dir / f"fluence_{wl}.bin"
-        if fp.exists():
-            fluence[wl] = np.fromfile(fp, dtype=np.float32).reshape((nz, ny, nx))
+    if nx is not None:
+        vol_path = data_dir / "volume.bin"
+        vol = np.fromfile(vol_path, dtype=np.uint8).reshape((nz, ny, nx)) if vol_path.exists() else None
+
+        for wl in WL_KEYS:
+            fp = data_dir / f"fluence_{wl}.bin"
+            if fp.exists():
+                fluence[wl] = np.fromfile(fp, dtype=np.float32).reshape((nz, ny, nx))
 
     results = {}
     for wl in WL_KEYS:
@@ -150,14 +161,12 @@ def load_data(data_dir, apply_irf=True, irf_fwhm_ps=100.0):
         if fp.exists():
             raw = np.fromfile(fp, dtype=np.float64)
             tpsf_raw = raw.reshape(len(raw) // 512, 512)
-            # Apply realistic IRF convolution for temporal blurring
             if apply_irf:
                 tpsf[wl] = convolve_tpsf_with_irf(tpsf_raw, fwhm_ps=irf_fwhm_ps, bin_width_ps=10.0)
             else:
                 tpsf[wl] = tpsf_raw
 
     paths = {}
-    MAX_PATH_STEPS = 2048
     for wl in WL_KEYS:
         meta_fp = data_dir / f"paths_meta_{wl}.bin"
         pos_fp = data_dir / f"paths_pos_{wl}.bin"
@@ -167,7 +176,8 @@ def load_data(data_dir, apply_irf=True, irf_fwhm_ps=100.0):
             det_ids = raw_meta[0::2]
             path_lens = raw_meta[1::2]
             raw_pos = np.fromfile(pos_fp, dtype=np.float32)
-            positions = raw_pos.reshape(num_paths, MAX_PATH_STEPS, 3)
+            max_path_steps = len(raw_pos) // (num_paths * 3)
+            positions = raw_pos.reshape(num_paths, max_path_steps, 3)
             valid = path_lens > 0
             paths[wl] = {
                 "det_ids": det_ids[valid],
@@ -873,10 +883,19 @@ def _ellipsoid_boundary(cx, cy, a, b, n=100):
 
 
 def plot_photon_paths(paths, results, meta, output_dir):
-    dx = meta["dx"]
-    cx = meta["nx"] * dx / 2
-    cy = meta["ny"] * dx / 2
-    cz = meta["nz"] * dx / 2
+    if "dx" in meta:
+        dx = meta["dx"]
+        cx = meta["nx"] * dx / 2
+        cy = meta["ny"] * dx / 2
+        cz = meta["nz"] * dx / 2
+    elif "bbox_min" in meta:
+        bmin = meta["bbox_min"]
+        bmax = meta["bbox_max"]
+        cx = (bmin[0] + bmax[0]) / 2
+        cy = (bmin[1] + bmax[1]) / 2
+        cz = (bmin[2] + bmax[2]) / 2
+    else:
+        return
 
     for wl_key in tqdm(list(paths.keys()), desc="Photon paths", unit="wl"):
         pdata = paths[wl_key]

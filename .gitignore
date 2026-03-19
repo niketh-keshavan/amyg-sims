@@ -9,3 +9,6 @@ venv/
 results_*/
 *.mmcmesh
 check_mesh.py
+mesh_viewer.html
+data_mmc_10B/
+data_mmc_1M_test/

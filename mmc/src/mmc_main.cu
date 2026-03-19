@@ -134,7 +134,7 @@ static std::vector<float> parse_wavelengths(const char* str) {
 }
 
 // ---------------------------------------------------------------------------
-// Find source position: project from amygdala center to nearest scalp node
+// Find source position: nearest scalp surface point to amygdala centroid
 // ---------------------------------------------------------------------------
 static void find_source_on_scalp(const HostMesh& mesh,
                                   float& src_x, float& src_y, float& src_z,
@@ -172,12 +172,12 @@ static void find_source_on_scalp(const HostMesh& mesh,
     printf("  Right amygdala centroid: (%.1f, %.1f, %.1f) mm [%d vertices]\n",
            amyg_cx, amyg_cy, amyg_cz, amyg_count);
 
-    // Project from amygdala centroid outward to find the nearest point on the
-    // actual mesh scalp surface. The old ellipsoidal model (semi-axes 78,95,85)
-    // placed the source ~26mm INSIDE the head on this mesh.
+    // Find the scalp surface point closest to the amygdala centroid.
+    // This minimizes source-to-target distance (~40-45mm to FT8 area)
+    // vs the old ray-projection method which landed at T8 (~52mm away).
     //
     // Strategy: collect all external scalp boundary face centroids, then find
-    // the one nearest to the radial projection from the amygdala center.
+    // the one with minimum Euclidean distance to the amygdala centroid.
 
     // Collect external scalp face centroids + normals
     struct ScalpFace { float x, y, z, nx, ny, nz; };
@@ -216,31 +216,24 @@ static void find_source_on_scalp(const HostMesh& mesh,
     }
     printf("  Found %d external scalp boundary faces\n", (int)ext_faces.size());
 
-    // Direction from origin through amygdala center (radial projection)
-    float dir_x = amyg_cx, dir_y = amyg_cy, dir_z = amyg_cz;
-    float dir_mag = sqrtf(dir_x*dir_x + dir_y*dir_y + dir_z*dir_z);
-    dir_x /= dir_mag; dir_y /= dir_mag; dir_z /= dir_mag;
-
-    // Find the external scalp face whose centroid is closest to the ray
-    // from origin in the amygdala direction. Use projection distance.
+    // Find the external scalp face whose centroid is closest (Euclidean)
+    // to the amygdala centroid. This places the source directly above the
+    // amygdala (~FT8 area) rather than at T8 via ray-projection.
     float best_d2 = 1e30f;
     int best_idx = -1;
     for (int j = 0; j < (int)ext_faces.size(); j++) {
-        // Project face centroid onto the ray from origin
-        float dot = ext_faces[j].x * dir_x + ext_faces[j].y * dir_y + ext_faces[j].z * dir_z;
-        if (dot < 0) continue; // behind origin
-        // Perpendicular distance to ray
-        float px = ext_faces[j].x - dot * dir_x;
-        float py = ext_faces[j].y - dot * dir_y;
-        float pz = ext_faces[j].z - dot * dir_z;
-        float d2 = px*px + py*py + pz*pz;
+        float dx = ext_faces[j].x - amyg_cx;
+        float dy = ext_faces[j].y - amyg_cy;
+        float dz = ext_faces[j].z - amyg_cz;
+        float d2 = dx*dx + dy*dy + dz*dz;
         if (d2 < best_d2) { best_d2 = d2; best_idx = j; }
     }
 
     if (best_idx < 0) {
-        fprintf(stderr, "ERROR: no external scalp face found in amygdala direction!\n");
+        fprintf(stderr, "ERROR: no external scalp face found near amygdala!\n");
+        float dir_mag = sqrtf(amyg_cx*amyg_cx + amyg_cy*amyg_cy + amyg_cz*amyg_cz);
         src_x = amyg_cx; src_y = amyg_cy; src_z = amyg_cz;
-        src_dx = -dir_x; src_dy = -dir_y; src_dz = -dir_z;
+        src_dx = -amyg_cx/dir_mag; src_dy = -amyg_cy/dir_mag; src_dz = -amyg_cz/dir_mag;
         return;
     }
 
@@ -277,6 +270,59 @@ static void find_source_on_scalp(const HostMesh& mesh,
 }
 
 // ---------------------------------------------------------------------------
+// Snap a point to the nearest external scalp surface face centroid.
+// Returns the face centroid position and outward normal.
+// ---------------------------------------------------------------------------
+static void snap_to_scalp_surface(
+    const HostMesh& mesh,
+    float in_x, float in_y, float in_z,
+    float& out_x, float& out_y, float& out_z,
+    float& out_nx, float& out_ny, float& out_nz)
+{
+    static const int FV[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
+    float best_d2 = 1e30f;
+
+    for (int e = 0; e < mesh.num_elements; e++) {
+        if (mesh.tissue[e] != TISSUE_SCALP) continue;
+        for (int f = 0; f < 4; f++) {
+            if (mesh.neighbors[e * 4 + f] != -1) continue;
+            float fx = 0, fy = 0, fz = 0;
+            for (int i = 0; i < 3; i++) {
+                int vi = mesh.elements[e * 4 + FV[f][i]];
+                fx += mesh.nodes[vi * 3 + 0];
+                fy += mesh.nodes[vi * 3 + 1];
+                fz += mesh.nodes[vi * 3 + 2];
+            }
+            fx /= 3; fy /= 3; fz /= 3;
+            float ddx = fx - in_x, ddy = fy - in_y, ddz = fz - in_z;
+            float d2 = ddx*ddx + ddy*ddy + ddz*ddz;
+            if (d2 < best_d2) {
+                best_d2 = d2;
+                out_x = fx; out_y = fy; out_z = fz;
+                int va = mesh.elements[e * 4 + FV[f][0]];
+                int vb = mesh.elements[e * 4 + FV[f][1]];
+                int vc = mesh.elements[e * 4 + FV[f][2]];
+                float e1x = mesh.nodes[vb*3+0]-mesh.nodes[va*3+0];
+                float e1y = mesh.nodes[vb*3+1]-mesh.nodes[va*3+1];
+                float e1z = mesh.nodes[vb*3+2]-mesh.nodes[va*3+2];
+                float e2x = mesh.nodes[vc*3+0]-mesh.nodes[va*3+0];
+                float e2y = mesh.nodes[vc*3+1]-mesh.nodes[va*3+1];
+                float e2z = mesh.nodes[vc*3+2]-mesh.nodes[va*3+2];
+                out_nx = e1y*e2z - e1z*e2y;
+                out_ny = e1z*e2x - e1x*e2z;
+                out_nz = e1x*e2y - e1y*e2x;
+                float nm = sqrtf(out_nx*out_nx + out_ny*out_ny + out_nz*out_nz);
+                if (nm > 0) { out_nx /= nm; out_ny /= nm; out_nz /= nm; }
+            }
+        }
+    }
+
+    // Ensure normal points outward
+    float dot_out = out_nx * out_x + out_ny * out_y + out_nz * out_z;
+    if (dot_out < 0) { out_nx = -out_nx; out_ny = -out_ny; out_nz = -out_nz; }
+}
+
+// ---------------------------------------------------------------------------
 // Build detectors on scalp surface for MMC mesh
 // Places detectors at various source-detector separations along the scalp
 // ---------------------------------------------------------------------------
@@ -287,11 +333,25 @@ static std::vector<Detector> build_mmc_detectors(
     std::vector<float>& out_separations,
     std::vector<float>& out_angles)
 {
-    // Target SDS values matching voxel MC detector layout (src/detector.cu:62-100)
-    float target_sds[] = { 8, 8, 15, 20, 22, 25, 28, 30, 33, 35, 40,
-                           20, 25, 30, 35, 20, 25, 30, 35, 25, 35, 25, 35 };
-    float target_angles[] = { 0, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              30, 30, 30, 30, -30, -30, -30, -30, 60, 60, -60, -60 };
+    // Target SDS values: short-SDS for SSR, mid-range sweet spot, extended range
+    float target_sds[] = {
+        8,  8,                          // SSR reference (0°, 180°)
+        12, 12,                         // SSR reference (±60°)
+        20, 22, 25, 28, 30, 33, 35, 40, // axial sweet spot
+        20, 25, 30, 35,                 // +30° ring
+        20, 25, 30, 35,                 // -30° ring
+        25, 35, 25, 35,                 // ±60° ring
+        45, 45, 50, 50                  // extended sweet spot (±45°)
+    };
+    float target_angles[] = {
+        0, 180,                         // SSR reference
+        60, -60,                        // SSR reference
+        0, 0, 0, 0, 0, 0, 0, 0,        // axial
+        30, 30, 30, 30,                 // +30°
+        -30, -30, -30, -30,             // -30°
+        60, 60, -60, -60,              // ±60°
+        45, -45, 45, -45                // extended ±45°
+    };
     int n_targets = sizeof(target_sds) / sizeof(target_sds[0]);
 
     // Build a tangent frame on the scalp at the source
@@ -360,34 +420,59 @@ static std::vector<Detector> build_mmc_detectors(
         float dy_scalp = cosf(angle_rad) * ty + sinf(angle_rad) * by;
         float dz_scalp = cosf(angle_rad) * tz + sinf(angle_rad) * bz;
 
-        // Iterative SDS placement: step along tangent, snap to surface, correct
-        // This handles surface curvature that causes straight-line projection to miss
-        float scale = sds;
+        // Iterative SDS placement: step along tangent, snap to surface, correct.
+        // For short SDS (<=15mm), tangent stepping overshoots on curved scalp,
+        // so we use binary search. For long SDS, multiplicative correction works.
         int best_idx = -1;
         float actual_sds = 0;
-        for (int iter = 0; iter < 10; iter++) {
-            float target_x = src_x + dx_scalp * scale;
-            float target_y = src_y + dy_scalp * scale;
-            float target_z = src_z + dz_scalp * scale;
 
+        auto snap_to_scalp = [&](float sc, int& out_idx, float& out_sds) {
+            float target_x = src_x + dx_scalp * sc;
+            float target_y = src_y + dy_scalp * sc;
+            float target_z = src_z + dz_scalp * sc;
             float best_d2 = 1e30f;
-            best_idx = -1;
+            out_idx = -1;
             for (int j = 0; j < (int)scalp_pts.size(); j++) {
                 float ddx = scalp_pts[j].x - target_x;
                 float ddy = scalp_pts[j].y - target_y;
                 float ddz = scalp_pts[j].z - target_z;
                 float d2 = ddx*ddx + ddy*ddy + ddz*ddz;
-                if (d2 < best_d2) { best_d2 = d2; best_idx = j; }
+                if (d2 < best_d2) { best_d2 = d2; out_idx = j; }
             }
-            if (best_idx < 0) break;
+            if (out_idx >= 0) {
+                out_sds = sqrtf(
+                    (scalp_pts[out_idx].x-src_x)*(scalp_pts[out_idx].x-src_x) +
+                    (scalp_pts[out_idx].y-src_y)*(scalp_pts[out_idx].y-src_y) +
+                    (scalp_pts[out_idx].z-src_z)*(scalp_pts[out_idx].z-src_z));
+            }
+        };
 
-            actual_sds = sqrtf(
-                (scalp_pts[best_idx].x-src_x)*(scalp_pts[best_idx].x-src_x) +
-                (scalp_pts[best_idx].y-src_y)*(scalp_pts[best_idx].y-src_y) +
-                (scalp_pts[best_idx].z-src_z)*(scalp_pts[best_idx].z-src_z));
-
-            if (fabsf(actual_sds - sds) < 1.0f) break; // within 1mm tolerance
-            if (actual_sds > 0.1f) scale *= sds / actual_sds;
+        if (sds <= 15.0f) {
+            // Binary search for short SDS to avoid overshoot divergence
+            float lo = 0.0f, hi = sds;
+            // First expand hi until actual_sds >= sds
+            snap_to_scalp(hi, best_idx, actual_sds);
+            while (best_idx >= 0 && actual_sds < sds && hi < sds * 4.0f) {
+                hi *= 1.5f;
+                snap_to_scalp(hi, best_idx, actual_sds);
+            }
+            for (int iter = 0; iter < 20; iter++) {
+                float mid = (lo + hi) * 0.5f;
+                snap_to_scalp(mid, best_idx, actual_sds);
+                if (best_idx < 0) break;
+                if (actual_sds < sds) lo = mid;
+                else hi = mid;
+                if (fabsf(actual_sds - sds) < 0.5f) break;
+            }
+        } else {
+            // Multiplicative correction for long SDS (converges well)
+            float scale = sds;
+            for (int iter = 0; iter < 15; iter++) {
+                snap_to_scalp(scale, best_idx, actual_sds);
+                if (best_idx < 0) break;
+                if (fabsf(actual_sds - sds) < 0.5f) break;
+                if (actual_sds > 0.1f) scale *= sds / actual_sds;
+            }
         }
 
         if (best_idx < 0) continue;
@@ -437,6 +522,7 @@ int main(int argc, char** argv) {
     std::string mesh_path = "mni152_head.mmcmesh";
     std::string output_dir = "data_mmc";
     std::vector<float> wavelengths;
+    int source_index = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--photons") == 0 && i + 1 < argc) {
@@ -451,6 +537,13 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[i], "--wavelengths") == 0 && i + 1 < argc) {
             wavelengths = parse_wavelengths(argv[i + 1]);
             i++;
+        } else if (strcmp(argv[i], "--source-index") == 0 && i + 1 < argc) {
+            source_index = atoi(argv[i + 1]);
+            if (source_index < 0 || source_index > 3) {
+                fprintf(stderr, "ERROR: --source-index must be 0-3\n");
+                return 1;
+            }
+            i++;
         }
     }
 
@@ -459,10 +552,14 @@ int main(int argc, char** argv) {
         wavelengths.push_back(850.0f);
     }
 
+    const char* source_names[] = {
+        "FT8 area (optimal)", "20mm anterior", "20mm posterior", "15mm superior"
+    };
     printf("Configuration:\n");
     printf("  Mesh: %s\n", mesh_path.c_str());
     printf("  Photons per wavelength: %llu\n", (unsigned long long)num_photons);
     printf("  Output directory: %s\n", output_dir.c_str());
+    printf("  Source index: %d (%s)\n", source_index, source_names[source_index]);
     printf("  Wavelengths:");
     for (float wl : wavelengths) printf(" %.0fnm", wl);
     printf("\n\n");
@@ -509,9 +606,52 @@ int main(int argc, char** argv) {
         grid_offsets, grid_counts, grid_tets, cell_size);
 
     // Find source position on scalp
-    printf("\n--- Source placement ---\n");
+    printf("\n--- Source placement (index %d: %s) ---\n",
+           source_index, source_names[source_index]);
     float src_x, src_y, src_z, src_dx, src_dy, src_dz;
     find_source_on_scalp(mesh, src_x, src_y, src_z, src_dx, src_dy, src_dz);
+
+    // For source indices 1-3, offset from the base optimal source and snap to scalp.
+    // MNI approximate directions at the FT8 area (~right temporal):
+    //   anterior = roughly +Y direction
+    //   posterior = roughly -Y direction
+    //   superior = roughly +Z direction
+    // We offset from the scalp surface point, then snap back to the nearest
+    // scalp face.
+    if (source_index > 0) {
+        // Get the base scalp surface point (before 0.5mm inset)
+        float base_x = src_x + (-src_dx) * 0.5f;
+        float base_y = src_y + (-src_dy) * 0.5f;
+        float base_z = src_z + (-src_dz) * 0.5f;
+
+        float offset_x = 0, offset_y = 0, offset_z = 0;
+        if (source_index == 1) { offset_y = 20.0f; }        // anterior (+Y in MNI)
+        else if (source_index == 2) { offset_y = -20.0f; }   // posterior (-Y in MNI)
+        else if (source_index == 3) { offset_z = 15.0f; }    // superior (+Z in MNI)
+
+        float target_x = base_x + offset_x;
+        float target_y = base_y + offset_y;
+        float target_z = base_z + offset_z;
+
+        float snap_x, snap_y, snap_z, snap_nx, snap_ny, snap_nz;
+        snap_to_scalp_surface(mesh, target_x, target_y, target_z,
+                              snap_x, snap_y, snap_z, snap_nx, snap_ny, snap_nz);
+
+        // Place source 0.5mm inward from scalp surface
+        src_x = snap_x - snap_nx * 0.5f;
+        src_y = snap_y - snap_ny * 0.5f;
+        src_z = snap_z - snap_nz * 0.5f;
+        src_dx = -snap_nx;
+        src_dy = -snap_ny;
+        src_dz = -snap_nz;
+
+        float dist_base = sqrtf((snap_x-base_x)*(snap_x-base_x) +
+                                (snap_y-base_y)*(snap_y-base_y) +
+                                (snap_z-base_z)*(snap_z-base_z));
+        printf("  Offset source %d: (%.1f, %.1f, %.1f) mm, %.1fmm from base\n",
+               source_index, src_x, src_y, src_z, dist_base);
+        printf("  Source direction: (%.3f, %.3f, %.3f)\n", src_dx, src_dy, src_dz);
+    }
 
     // Build detectors
     printf("\n--- Detector placement ---\n");
@@ -659,6 +799,8 @@ int main(int argc, char** argv) {
                 mesh.bbox_max[0], mesh.bbox_max[1], mesh.bbox_max[2]);
         fprintf(f, "  \"scattering_model\": \"mie_power_law\",\n");
         fprintf(f, "  \"detector_radius_mm\": 1.69,\n");
+        fprintf(f, "  \"source_index\": %d,\n", source_index);
+        fprintf(f, "  \"source_label\": \"%s\",\n", source_names[source_index]);
         fprintf(f, "  \"source_position_mm\": [%.2f, %.2f, %.2f],\n",
                 src_x, src_y, src_z);
         fprintf(f, "  \"wavelengths_nm\": [");
