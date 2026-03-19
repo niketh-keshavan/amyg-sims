@@ -920,6 +920,11 @@ TPSF_BIN_PS = 10.0   # picoseconds per bin
 TPSF_N_BINS = 512
 C_TISSUE_MM_PS = 0.2148  # speed of light in tissue ~0.215 mm/ps (n~1.4)
 
+# Realistic noise model for TPSF moments (Step 6)
+IRF_FWHM_PS = 80.0           # 80 ps IRF FWHM (typical for fast SPAD/SiPM systems)
+PHYSIO_NOISE_MEANTIME_PS = 5.0  # 5 ps RMS from cardiac/respiratory pulsation
+SCALP_MOMENT_SHIFT_PS = 50.0    # Mean-time shift from scalp hemodynamics (50 ps >> amygdala signal)
+
 def tpsf_moment_analysis(results, tpsf_730, tpsf_850):
     print("\n" + "=" * 80)
     print("10. TPSF MOMENT ANALYSIS (depth discrimination via temporal statistics)")
@@ -936,10 +941,13 @@ def tpsf_moment_analysis(results, tpsf_730, tpsf_850):
 
     moment_results = []
 
-    for wl_idx, (wl_key, tpsf) in enumerate(zip(WL_KEYS, [tpsf_730, tpsf_850])):
-        if tpsf is None:
+    for wl_idx, (wl_key, tpsf_raw) in enumerate(zip(WL_KEYS, [tpsf_730, tpsf_850])):
+        if tpsf_raw is None:
             print(f"\n  {wl_key}: No TPSF data, skipping.")
             continue
+
+        # Step 6: Convolve with IRF for realistic TPSF
+        tpsf = convolve_tpsf_with_irf(tpsf_raw, fwhm_ps=IRF_FWHM_PS, bin_width_ps=TPSF_BIN_PS)
 
         r = results[wl_key]
         n_dets = min(tpsf.shape[0], len(r["detectors"]))
@@ -1006,14 +1014,27 @@ def tpsf_moment_analysis(results, tpsf_730, tpsf_850):
                     dt_dua = -numerator / denominator  # ps * mm
 
             # Min detectable ΔHbO from moment sensitivity
-            # Shot noise on <t>: sigma_<t> = sqrt(var_t / N_det)
+            # Step 6: Realistic noise model includes:
+            # 1. Shot noise: sigma_shot = sqrt(var_t / N_det)
+            # 2. IRF jitter: sigma_irf ~ IRF_FWHM / sqrt(N_det) (temporal precision limit)
+            # 3. Physiological noise: sigma_physio = PHYSIO_NOISE_MEANTIME_PS
             min_hbo_moment = float('inf')
             if N_det > 0 and abs(dt_dua) > 0:
-                sigma_mean_t = np.sqrt(var_t / N_det) if var_t > 0 else float('inf')
+                sigma_shot = np.sqrt(var_t / N_det) if var_t > 0 else 0
+                # IRF jitter: precision improves with sqrt(N) but IRF width sets floor
+                sigma_irf = IRF_FWHM_PS / (2.355 * np.sqrt(N_det))  # 2.355 = sigma to FWHM
+                sigma_physio = PHYSIO_NOISE_MEANTIME_PS
+                # Combined noise in quadrature
+                sigma_mean_t = np.sqrt(sigma_shot**2 + sigma_irf**2 + sigma_physio**2)
+                
+                # Step 6: Scalp contamination - mean-time shifts from scalp hemodynamics
+                # Scalp signal is ~70,000x stronger than amygdala in CW
+                # For moments: scalp shift ~50 ps >> amygdala-induced shift
+                # Effective SNR degradation from scalp contamination
+                scalp_contamination_factor = 1.0 + (SCALP_MOMENT_SHIFT_PS / abs(dt_dua))**2
+                sigma_mean_t *= np.sqrt(scalp_contamination_factor)
+                
                 # dt_dua has units ps*mm; converting ΔHbO in mM to Δμ_a:
-                # Δμ_a = ε_HbO * ΔHbO (mM^-1 mm^-1 * mM = mm^-1)
-                # Δ<t> = dt_dua * Δμ_a
-                # SNR=1: sigma_mean_t = |dt_dua| * ε_HbO * ΔHbO_min
                 epsilon_hbo = EPSILON_HBO[wl_idx]
                 if epsilon_hbo > 0 and not np.isinf(sigma_mean_t):
                     min_hbo_moment = sigma_mean_t / (abs(dt_dua) * epsilon_hbo) * 1e3  # uM
@@ -1052,9 +1073,19 @@ def tpsf_moment_analysis(results, tpsf_730, tpsf_850):
         mean_t = mr['mean_t']
         dvar_dua = -2.0 * mean_t * dt_dua  # ps^2 * mm
 
-        # Shot noise on variance: sigma_var ~ var_t * sqrt(2/N_det)
-        # (for large N, variance of sample variance ~ 2*var^2/N)
-        sigma_var = var_t * np.sqrt(2.0 / N_det)
+        # Step 6: Realistic noise on variance
+        # Shot noise + IRF broadening + physiological variance fluctuations
+        sigma_var_shot = var_t * np.sqrt(2.0 / N_det)
+        # IRF adds variance ~ (IRF width)^2, reduces precision
+        sigma_irf_var = (IRF_FWHM_PS / 2.355)**2 / np.sqrt(N_det)
+        # Physiological variance noise (cardiac/respiration modulates variance)
+        sigma_physio_var = var_t * 0.05  # 5% variance fluctuation from physiology
+        sigma_var = np.sqrt(sigma_var_shot**2 + sigma_irf_var**2 + sigma_physio_var**2)
+        
+        # Step 6: Scalp contamination for variance
+        # Scalp hemodynamics dominate variance shifts
+        scalp_var_factor = 1.0 + (SCALP_MOMENT_SHIFT_PS * mean_t / var_t)**2
+        sigma_var *= np.sqrt(scalp_var_factor)
 
         # Min detectable ΔHbO from variance
         epsilon_hbo = EPSILON_HBO[wl_idx]
