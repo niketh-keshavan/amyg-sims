@@ -216,24 +216,62 @@ static void find_source_on_scalp(const HostMesh& mesh,
     }
     printf("  Found %d external scalp boundary faces\n", (int)ext_faces.size());
 
-    // Find the external scalp face whose centroid is closest (Euclidean)
-    // to the amygdala centroid. This places the source directly above the
-    // amygdala (~FT8 area) rather than at T8 via ray-projection.
-    float best_d2 = 1e30f;
+    // Find scalp point ~40-50mm from amygdala on lateral surface.
+    // The closest scalp point is ~60mm (inferior), so we search for points
+    // in the 35-55mm range on the lateral temporal surface for better SNR.
+    const float TARGET_MIN = 35.0f, TARGET_MAX = 55.0f, TARGET_OPT = 45.0f;
+    
+    float best_score = -1e30f;
     int best_idx = -1;
+    float best_dist = 0;
+    
     for (int j = 0; j < (int)ext_faces.size(); j++) {
         float dx = ext_faces[j].x - amyg_cx;
         float dy = ext_faces[j].y - amyg_cy;
         float dz = ext_faces[j].z - amyg_cz;
-        float d2 = dx*dx + dy*dy + dz*dz;
-        if (d2 < best_d2) { best_d2 = d2; best_idx = j; }
+        float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+        
+        // Only consider points in target range
+        if (dist < TARGET_MIN || dist > TARGET_MAX) continue;
+        
+        // Ensure normal points outward
+        float nx = ext_faces[j].nx, ny = ext_faces[j].ny, nz = ext_faces[j].nz;
+        float dot_out = nx * ext_faces[j].x + ny * ext_faces[j].y + nz * ext_faces[j].z;
+        if (dot_out < 0) { nx = -nx; ny = -ny; nz = -nz; }
+        
+        // Direction to amygdala
+        float to_amyg_x = -dx/dist, to_amyg_y = -dy/dist, to_amyg_z = -dz/dist;
+        
+        // Score: alignment + lateralness + height + distance_to_optimal
+        float alignment = -(nx*to_amyg_x + ny*to_amyg_y + nz*to_amyg_z);
+        float lateralness = (ext_faces[j].x - amyg_cx) * 0.02f;
+        float height = -(ext_faces[j].z < amyg_cz - 30.0f ? 
+                        (amyg_cz - 30.0f - ext_faces[j].z) * 0.02f : 0);
+        float dist_score = -fabsf(dist - TARGET_OPT) * 0.05f;
+        
+        float score = alignment + lateralness + height + dist_score;
+        if (score > best_score) {
+            best_score = score; best_idx = j; best_dist = dist;
+        }
     }
-
+    
+    // Fallback to closest point if no point in range
     if (best_idx < 0) {
-        fprintf(stderr, "ERROR: no external scalp face found near amygdala!\n");
-        float dir_mag = sqrtf(amyg_cx*amyg_cx + amyg_cy*amyg_cy + amyg_cz*amyg_cz);
+        printf("  WARNING: no point in 35-55mm range, using closest\n");
+        float best_d2 = 1e30f;
+        for (int j = 0; j < (int)ext_faces.size(); j++) {
+            float dx = ext_faces[j].x - amyg_cx;
+            float dy = ext_faces[j].y - amyg_cy;
+            float dz = ext_faces[j].z - amyg_cz;
+            float d2 = dx*dx + dy*dy + dz*dz;
+            if (d2 < best_d2) { best_d2 = d2; best_idx = j; best_dist = sqrtf(d2); }
+        }
+    }
+    
+    if (best_idx < 0) {
+        fprintf(stderr, "ERROR: no suitable scalp point found!\n");
         src_x = amyg_cx; src_y = amyg_cy; src_z = amyg_cz;
-        src_dx = -amyg_cx/dir_mag; src_dy = -amyg_cy/dir_mag; src_dz = -amyg_cz/dir_mag;
+        src_dx = 0; src_dy = 0; src_dz = 1;
         return;
     }
 
@@ -261,12 +299,9 @@ static void find_source_on_scalp(const HostMesh& mesh,
     src_dy = -surf_ny;
     src_dz = -surf_nz;
 
-    float dist_to_amyg = sqrtf((surf_x-amyg_cx)*(surf_x-amyg_cx) +
-                               (surf_y-amyg_cy)*(surf_y-amyg_cy) +
-                               (surf_z-amyg_cz)*(surf_z-amyg_cz));
     printf("  Source position: (%.1f, %.1f, %.1f) mm\n", src_x, src_y, src_z);
     printf("  Source direction: (%.3f, %.3f, %.3f)\n", src_dx, src_dy, src_dz);
-    printf("  Distance to amygdala: %.1f mm\n", dist_to_amyg);
+    printf("  Distance to amygdala: %.1f mm\n", best_dist);
 }
 
 // ---------------------------------------------------------------------------
