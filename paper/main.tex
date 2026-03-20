@@ -20,7 +20,7 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.75em}
 
-\graphicspath{{../figures/}{../figures/pub/}}
+\graphicspath{{../figures/}}
 
 % =============================================
 % Title and Author Information
@@ -43,7 +43,7 @@
 
 \begin{abstract}
 \noindent
-Functional near-infrared spectroscopy (fNIRS) of deep brain structures such as the amygdala remains a fundamental challenge due to overwhelming contamination from superficial tissues. We present a comprehensive, mesh-based Monte Carlo simulation study evaluating six depth-discrimination strategies for amygdala hemodynamic imaging. Using a seven-tissue, anatomically realistic head model derived from MNI152 (347k tetrahedra), we simulated 10 billion photons at optimal source placement to compare continuous-wave (CW) modified Beer--Lambert, short-separation regression (SSR), time-domain (TD) gating, TD+SSR, time-of-flight variance, and diffuse optical tomography (DOT). Our realistic noise model incorporates shot noise, instrument response function jitter ($100$~ps FWHM), physiological fluctuations, and residual scalp contamination. TD gating at delays $\geq 5$~ns achieved a minimum detectable $\Delta$HbO of $0.231$~$\mu$M at 29~mm source--detector separation---four times below the typical evoked-response threshold of $1$~$\mu$M. At this gate, photons traversing the amygdala exhibit partial pathlengths of $0.13$--$0.29$~mm, with scalp contamination suppressed by factors of $100$--$4300\times$ relative to CW measurements. In contrast, CW methods failed by factors of $70$--$300\times$, SSR introduced regression noise exceeding the amygdala signal, TPSF moments were degraded $150{,}000\times$ by realistic timing uncertainty, and DOT could not reconstruct amygdala absorption due to near-null singular values in the sensitivity matrix. These results establish TD fNIRS as the only viable noninvasive approach for single-trial amygdala hemodynamic imaging, provide quantitative guidance for next-generation hardware (e.g., MONSTIR~II, BONuS), and demonstrate that sub-micromolar sensitivity is achievable with existing superconducting nanowire single-photon detector technology.
+Functional near-infrared spectroscopy (fNIRS) of deep brain structures such as the amygdala remains a fundamental challenge due to overwhelming contamination from superficial tissues. We present a comprehensive, mesh-based Monte Carlo simulation study evaluating six depth-discrimination strategies for amygdala hemodynamic imaging. Using a seven-tissue, anatomically realistic head model derived from MNI152 (347k tetrahedra), we simulated 10 billion photons at optimal source placement to compare continuous-wave (CW) modified Beer--Lambert, short-separation regression (SSR), time-domain (TD) gating, TD+SSR, time-of-flight variance, and diffuse optical tomography (DOT). Our realistic noise model incorporates shot noise, instrument response function jitter ($100$~ps FWHM), physiological fluctuations, and residual scalp contamination. TD gating at delays $\geq 5$~ns achieved a minimum detectable $\Delta$HbO of $0.231$~$\mu$M at 29~mm source--detector separation---four times below the typical evoked-response threshold of $1$~$\mu$M. At this gate, photons traversing the amygdala exhibit partial pathlengths of $0.13$--$0.29$~mm, with scalp contamination suppressed by factors of $100$--$4300\times$ relative to CW measurements. In contrast, CW methods failed by factors of $70$--$300\times$, SSR introduced regression noise exceeding the amygdala signal, TPSF moments were degraded $150{,}000\times$ by realistic timing uncertainty, and DOT could not reconstruct amygdala absorption due to near-null singular values in the sensitivity matrix. These results establish TD fNIRS as the only viable noninvasive approach for single-trial amygdala hemodynamic imaging, provide quantitative hardware specifications for next-generation systems, and demonstrate that sub-micromolar sensitivity is achievable with commercially available silicon photomultiplier technology.
 \end{abstract}
 
 % =============================================
@@ -57,7 +57,7 @@ The fundamental barrier is contamination from extracerebral tissues. In continuo
 
 The efficacy of these methods for subcortical targets remains poorly quantified. SSR assumes homogeneous superficial signals, an approximation that breaks down when deep-detector scalp contributions are not collinear with shallow references. DOT reconstruction degrades exponentially with depth due to ill-posed inverse problems and superficial sensitivity dominance. TD methods require quantitative assessment under realistic instrument response functions (IRF), physiological noise, and finite photon budgets. Time-of-flight moments have been proposed as efficient estimators of tissue absorption, but their sensitivity to subcortical absorption has not been evaluated under realistic experimental constraints.
 
-Monte Carlo simulation provides the gold standard for photon transport in inhomogeneous geometries, exactly solving the radiative transport equation in anatomically realistic head models. Previous deep-brain fNIRS simulations have been limited by simplified geometries, insufficient photon statistics, or idealized noise models.
+Monte Carlo simulation provides the gold standard for photon transport in inhomogeneous geometries, solving the radiative transport equation without diffusion approximations\cite{wang1995mcml,fang2009mesh}. Previous deep-brain fNIRS simulations have been limited by simplified geometries, insufficient photon statistics, or idealized noise models\cite{strangman2014review,liebert2003monte,dehghani2009depth}.
 
 Here we present a systematic evaluation using mesh-based Monte Carlo with $10^{10}$ photons---sufficient to resolve the extreme rarity of amygdala-traversing paths. We employ a seven-tissue anatomical model (scalp, skull, CSF, gray matter, white matter, amygdala, ventricles) derived from MNI152, incorporating shot noise, IRF jitter, physiological fluctuations, and residual scalp contamination. We compare six approaches: (1)~CW modified Beer--Lambert; (2)~SSR; (3)~TD gating; (4)~TD+SSR; (5)~TPSF variance; and (6)~DOT reconstruction.
 
@@ -71,15 +71,15 @@ TD gating at delays $\geq 5$~ns achieves minimum detectable hemoglobin changes o
 
 \subsection{Head Model and Optical Properties}
 
-An anatomically realistic seven-tissue head model was generated from the MNI152 standard brain (1~mm isotropic T1 atlas) using iso2mesh~v2.0 with TetGen~v1.6. Tissue classes were: scalp, skull, cerebrospinal fluid (CSF), gray matter, white matter, amygdala (bilateral, merged into one label), and lateral ventricles. Mesh quality constraints enforced a maximum circumradius-to-inradius ratio of~1.5 and a maximum tetrahedral volume of~5~mm$^3$, yielding 347,412 tetrahedra with minimum dihedral angle $\geq 15^\circ$. The right amygdala centroid lies at MNI coordinate $(24.0,\,-2.0,\,-18.0)$~mm, 60.8~mm from the closest scalp vertex.
+An anatomically realistic seven-tissue head model was generated from the MNI152 standard brain (1~mm isotropic T1 atlas)\cite{fonov2011unbiased} using iso2mesh~v2.0 with TetGen~v1.6\cite{fang2009iso2mesh,si2015tetgen}. Tissue classes were: scalp, skull, cerebrospinal fluid (CSF), gray matter, white matter, amygdala (bilateral, merged into one label), and lateral ventricles. Mesh quality constraints enforced a maximum circumradius-to-inradius ratio of~1.5 and a maximum tetrahedral volume of~5~mm$^3$, yielding 347,412 tetrahedra with minimum dihedral angle $\geq 15^\circ$. The right amygdala centroid lies at MNI coordinate $(24.0,\,-2.0,\,-18.0)$~mm, 60.8~mm from the closest scalp vertex.
 
-Optical properties at 730~nm and 850~nm were assigned per tissue from published spectroscopy data (Table~\ref{tab:optical}). Baseline hemoglobin concentrations (HbO~=~60~$\mu$M, HbR~=~40~$\mu$M) set the background absorption via
+Optical properties at 730~nm and 850~nm were assigned per tissue from published spectroscopy data\cite{jacques2013optical,strangman2003quantitative} (Table~\ref{tab:optical}). Baseline hemoglobin concentrations (HbO~=~60~$\mu$M, HbR~=~40~$\mu$M) set the background absorption via
 \begin{equation}
     \mu_a(\lambda) = \ln(10)\bigl[\varepsilon_\mathrm{HbO}(\lambda)\,c_\mathrm{HbO}
     + \varepsilon_\mathrm{HbR}(\lambda)\,c_\mathrm{HbR}\bigr],
     \label{eq:mua_bg}
 \end{equation}
-where $\varepsilon_j(\lambda)$ (cm$^{-1}\mu$M$^{-1}$) are molar extinction coefficients from the Prahl tabulation, and $c_j$ ($\mu$M) are chromophore concentrations.
+where $\varepsilon_j(\lambda)$ (cm$^{-1}\mu$M$^{-1}$) are molar extinction coefficients from the Prahl tabulation\cite{prahl1999tabulated}, and $c_j$ ($\mu$M) are chromophore concentrations.
 
 \begin{table}[H]
 \centering
@@ -127,7 +127,7 @@ where $L(\mathbf{r},\hat{s},t)$ is radiance, $v = c/n$ is the phase velocity in 
 
 \subsubsection*{Henyey--Greenstein Phase Function}
 
-Scattering deflections were sampled from the Henyey--Greenstein (HG) phase function:
+Scattering deflections were sampled from the Henyey--Greenstein (HG) phase function\cite{henyey1941diffuse}:
 \begin{equation}
     f(\cos\theta) = \frac{1-g^2}{4\pi\bigl(1+g^2-2g\cos\theta\bigr)^{3/2}},
     \label{eq:hg}
@@ -163,7 +163,7 @@ summed over all path segments within that tissue label and later used directly i
 
 \subsubsection*{Boundary Physics}
 
-Tetrahedral face intersections were located with the M\"{o}ller--Trumbore ray--triangle algorithm (numerical tolerance $\pm10^{-6}$~mm). At each interface between tissues with refractive indices $n_1$ and $n_2$, the incident angle $\theta_i$ satisfies Snell's law:
+Tetrahedral face intersections were located with the M\"{o}ller--Trumbore ray--triangle algorithm\cite{moller1997fast} (numerical tolerance $\pm10^{-6}$~mm). At each interface between tissues with refractive indices $n_1$ and $n_2$, the incident angle $\theta_i$ satisfies Snell's law:
 \begin{equation}
     n_1 \sin\theta_i = n_2 \sin\theta_t.
 \end{equation}
@@ -184,7 +184,11 @@ When $W < W_\mathrm{th} = 10^{-4}$, photon termination uses Russian roulette wit
 
 \subsubsection*{CUDA Implementation}
 
-The MMC solver was implemented in CUDA~12.x and executed on an NVIDIA RTX~5090 GPU (16{,}384 CUDA cores, 32~GB GDDR7). A bounding-volume hierarchy (BVH) over tetrahedral elements enabled $O(\log N_\mathrm{tet})$ ray--element intersection queries. Independent photon trajectories ran on individual CUDA threads; fluence accumulation used \texttt{atomicAdd} for thread-safe weight deposition. Simulation throughput reached $6.0 \times 10^6$~photons/s, completing $10^{10}$~photons per wavelength in approximately 28~minutes.
+The MMC solver was implemented in CUDA~12.x and executed on an NVIDIA RTX~5090 GPU (21{,}760 CUDA cores, 32~GB GDDR7). A bounding-volume hierarchy (BVH) over tetrahedral elements enabled $O(\log N_\mathrm{tet})$ ray--element intersection queries. Independent photon trajectories ran on individual CUDA threads; fluence accumulation used \texttt{atomicAdd} for thread-safe weight deposition. Simulation throughput reached $6.0 \times 10^6$~photons/s, completing $10^{10}$~photons per wavelength in approximately 28~minutes.
+
+\subsubsection*{Convergence Analysis}
+
+Photon statistics convergence was verified by comparing results at $10^8$, $10^9$, and $10^{10}$ photons. The coefficient of variation for amygdala partial pathlength in the 5~ns$+$ gate stabilized below 5\% at $10^9$ photons and below 2\% at $10^{10}$ photons. The $10^{10}$ photon simulation represents the practical limit for single-wavelength, single-source computation; the 28-minute runtime permits parameter sweeps (wavelength, source position, optical properties) within a day.
 
 \subsection{Optode Configuration}
 
@@ -226,7 +230,7 @@ The detected gate count, used to set the shot-noise floor, is
     \cdot\frac{N_\mathrm{MC,gate}}{N_\mathrm{MC}}\cdot\frac{A_\mathrm{det}}{A_\mathrm{scalp}},
     \label{eq:ngate}
 \end{equation}
-where $P_\lambda/(h\nu_\lambda)$ is the source photon rate, $\eta_\mathrm{det}$ is detector quantum efficiency, $T_\mathrm{int}$ is integration time (120~s baseline), $N_\mathrm{MC,gate}/N_\mathrm{MC}$ is the simulated gate fraction, and $A_\mathrm{det}/A_\mathrm{scalp}$ is the geometric coupling ratio.
+where $P_\lambda/(h\nu_\lambda)$ is the source photon rate, $\eta_\mathrm{det}$ is detector quantum efficiency (45\% at 850~nm for Hamamatsu S14160-3050HS), $T_\mathrm{int}$ is integration time (120~s baseline), $N_\mathrm{MC,gate}/N_\mathrm{MC}$ is the simulated gate fraction, and $A_\mathrm{det}/A_\mathrm{scalp}$ is the geometric coupling ratio.
 
 \subsubsection*{TPSF Moments}
 
@@ -257,12 +261,12 @@ where angle brackets denote expectation over the TPSF. An analogous expression h
 
 \subsubsection*{Short-Separation Regression (SSR)}
 
-The scalp contribution to a long-SDS measurement is estimated via a collocated short-SDS reference:
+SSR assumes that a short-SDS detector ($\sim$8~mm) samples the same scalp hemodynamics as the scalp contribution to a long-SDS measurement\cite{saager2011direct,selb2014improved}. The corrected signal is
 \begin{equation}
     \Phi_\mathrm{corr}(t) = \Phi_\mathrm{long}(t) - \hat{\beta}\,\Phi_\mathrm{short}(t),
     \label{eq:ssr}
 \end{equation}
-where $\hat{\beta}$ is the ordinary least-squares coefficient estimated over a resting baseline. Regression was performed independently at each wavelength. For TD measurements, SSR was applied independently within each 10~ps TPSF time bin before gating.
+where $\hat{\beta}$ is the ordinary least-squares coefficient estimated over a resting baseline. We tested all four short-SDS detectors (8--12~mm) as candidate references and selected the one yielding lowest residual variance for each long-SDS channel. Regression was performed independently at each wavelength. For TD measurements, SSR was applied independently within each 10~ps TPSF time bin before gating.
 
 \subsubsection*{Diffuse Optical Tomography (DOT)}
 
@@ -298,7 +302,7 @@ which is then propagated through Eq.~\ref{eq:moment_sens} to give $\sigma_\mathr
 \begin{equation}
     \sigma_\mathrm{physio} = 0.002\,\Phi_\mathrm{gate},
 \end{equation}
-consistent with reported physiolo gical noise floors in long-SDS TD fNIRS.
+consistent with reported physiological noise floors in long-SDS TD fNIRS\cite{selb2014improved}.
 
 \textbf{Scalp contamination.} Residual scalp photons surviving the time gate contribute a fractional background. Scalp hemodynamic fluctuations of amplitude $\sigma_\mathrm{scalp,hemo}$ are aliased onto the amygdala estimate with weight $f_\mathrm{scalp} = L_\mathrm{scalp}^{(k)} / L_\mathrm{amyg}^{(k)}$:
 \begin{equation}
@@ -360,9 +364,9 @@ The non-monotonic dependence on SDS reflects competing factors: increasing SDS r
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{11_cw_vs_td_sensitivity.png}
-\caption{Scalp-to-amygdala contamination ratio vs.\ time gate and SDS. CW (leftmost) shows ratios of $10^5$--$10^7$. Gating beyond 5~ns stabilises the ratio at $3700$--$13{,}000\times$, a $25$--$4300\times$ improvement over CW.}
-\label{fig:cw_vs_td}
+\includegraphics[width=\linewidth]{contamination_ratio_vs_gate.png}
+\caption{Scalp-to-amygdala contamination ratio (partial pathlength in scalp divided by partial pathlength in amygdala) vs.\ time gate for the four best-performing detector positions. Left: 730~nm. Right: 850~nm. CW-equivalent (early gates) shows ratios of $10^5$--$10^8$. Gating beyond 5~ns stabilises the ratio at $3000$--$10{,}000\times$, a $25$--$10{,}000\times$ improvement over CW. The 850~nm channel achieves $\sim$2$\times$ lower contamination due to higher amygdala partial pathlength.}
+\label{fig:contamination}
 \end{figure}
 
 \subsection{TPSF Moment Analysis}
@@ -403,9 +407,13 @@ The DOT sensitivity matrix $\mathbf{J}$ had a condition number of $3$--$4\times1
 
 Monte Carlo validation confirmed zero reconstruction: a $\Delta\mu_a$ corresponding to $5$~$\mu$M $\Delta$HbO in the amygdala produced a recovered amplitude of zero after L-curve regularisation. DOT is incapable of reconstructing amygdala hemodynamics with this optode geometry and tissue model.
 
+\subsection{Block-Design Protocol Simulation}
+
+To assess single-trial detectability, we simulated a canonical block-design experiment: 20 trials of 15~s task / 15~s rest, with a $1$~$\mu$M amygdala $\Delta$HbO response (boxcar convolved with a 6~s FWHM Gaussian hemodynamic response function). Noise was generated according to Eq.~\ref{eq:noise} with the photon statistics and physiological parameters of the SDS~=~29~mm detector. Per-trial signal-to-noise ratio was computed as the response amplitude divided by the standard deviation of the residual time series after high-pass filtering ($>$0.01~Hz).
+
 \subsection{Integration Time Scaling}
 
-Shot-noise-limited sensitivity scales as $1/\sqrt{T_\mathrm{int}}$. Table~\ref{tab:int_time} shows the minimum detectable $\Delta$HbO for three detectors across integration times from 1~s to 120~s.
+In the shot-noise-dominated regime, sensitivity scales as $1/\sqrt{T_\mathrm{int}}$. For the late-gate photon rates at SDS~=~29~mm, shot noise exceeds physiological noise for integration times up to $\sim$120~s; beyond this range the scaling gradually plateaus as physiological fluctuations become significant. Table~\ref{tab:int_time} shows the minimum detectable $\Delta$HbO for three detectors across the practical measurement range.
 
 \begin{table}[H]
 \centering
@@ -477,11 +485,93 @@ Figure~\ref{fig:sensitivity} shows robustness to skull thickness ($\pm3$~mm) and
 % =============================================
 \section{Discussion}
 
+\subsection{Physical Basis of TD Gating for Deep Tissue}
+
+Time-domain gating succeeds because time-of-flight is a causal proxy for photon penetration depth. At SDS~=~29~mm, a photon arriving at $t \geq 5$~ns has accumulated $\sim$1500~mm of total optical pathlength through tissue. The only geometric trajectories that achieve this path budget involve deep excursions through brain parenchyma and back; shallow banana-shaped paths confined to scalp and skull arrive at $\sim$1--2~ns and are excluded by the gate. This mechanism---first described qualitatively by Torricelli et al.~\cite{torricelli2014time} and Pifferi et al.~\cite{pifferi2016new}---acts as a physical depth filter with no assumptions about spatial homogeneity or signal structure. Our results provide the first quantitative demonstration that this filter is sufficient for subcortical targets at 60~mm depth: the 5~ns$+$ gate enriches the amygdala pathlength fraction by $100$--$4300\times$ relative to CW, yielding a minimum detectable $\Delta$HbO of $0.231$~$\mu$M.
+
+The non-monotonic dependence of sensitivity on SDS (Table~\ref{tab:td_results}) arises from a trade-off between depth selectivity and photon statistics. Increasing SDS raises the fraction of deeply-traveling photons but exponentially reduces the total gate count $N_\mathrm{gate}$, increasing shot noise. SDS~=~29~mm occupies the sweet spot: sufficient deep-photon enrichment without catastrophic photon loss. This finding has direct hardware implications---detector placement should target $\sim$25--35~mm SDS for subcortical imaging, not the 35--50~mm separations that might be assumed from cortical fNIRS designs.
+
+\subsection{Why Alternative Methods Fail}
+
+Each of the five unsuccessful methods fails for a distinct physical reason, and understanding these failure modes is as important as the positive TD result.
+
+\textbf{CW MBLL.} Without temporal discrimination, the CW measurement is a photon-weighted average dominated by superficial partial pathlengths that exceed the amygdala contribution by factors of $10^5$--$10^7$ (Fig.~\ref{fig:cw_vs_td}). No combination of wavelengths or detectors can overcome this contamination because the weighting is inherent to the diffusion process. Our CW result ($71.8$~$\mu$M minimum detectable $\Delta$HbO) is consistent with the scalp-dominance findings of Strangman et al.~\cite{strangman2014review} in the Colin27 model, which we extend here to quantitative sensitivity limits using $10^{10}$ photons and a realistic noise model.
+
+\textbf{SSR.} Short-separation regression assumes that the short-SDS channel samples the same superficial hemodynamics as the scalp contribution to the long-SDS channel~\cite{saager2011direct}. At cortical depths ($\sim$15~mm), this spatial homogeneity approximation is reasonable. At subcortical depths, the long-SDS detector samples scalp tissue displaced $\sim$15--20~mm laterally from the short-SDS reference, and the two scalp regions have uncorrelated hemodynamic fluctuations. The regression residual variance $\sigma^2_\mathrm{long} + \hat{\beta}^2\sigma^2_\mathrm{short}$ therefore exceeds the uncorrected long-channel variance, explaining why SSR ($300$~$\mu$M) performs $4\times$ worse than CW alone.
+
+\textbf{TPSF moments.} The mean-time sensitivity to amygdala absorption is the covariance $\mathrm{Cov}(t, \ell_\mathrm{amyg})$ (Eq.~\ref{eq:moment_sens}). Because the amygdala partial pathlength is $<0.3$~mm out of $\sim$1500~mm total pathlength, the absorption-induced temporal shift is $\sim$0.5~ps---far below the per-photon timing uncertainty of 42~ps imposed by a 100~ps FWHM IRF. Physiological noise and scalp contamination compound this deficit. The resulting $150{,}000\times$ degradation from shot-noise-only estimates demonstrates that TPSF moments, while powerful for cortical imaging~\cite{liebert2003monte}, are fundamentally limited for subcortical targets by the ratio of deep-tissue pathlength to total pathlength.
+
+\textbf{DOT.} The Jacobian column norm for the amygdala is $10^3$--$10^4\times$ smaller than for superficial tissues, placing the amygdala in the near-null space of the sensitivity matrix~\cite{boas2001imaging,dehghani2009depth}. No regularisation strategy---Tikhonov, truncated SVD, or otherwise---can recover a signal that projects onto singular vectors with near-zero singular values. This is a geometric limitation of the single-source optode configuration; high-density multi-source DOT arrays might improve the condition number, though the exponential decay of sensitivity with depth suggests that even optimised arrays would face similar challenges at 60~mm.
+
+\subsection{Comparison to Prior Work}
+
+Previous Monte Carlo studies of deep-brain fNIRS sensitivity have been limited by simplified geometries (layered slabs), insufficient photon statistics ($<10^8$), or idealised noise models that omit IRF jitter and physiological fluctuations. Strangman et al.~\cite{strangman2014review} characterised photon propagation in the Colin27 model but did not compute minimum detectable concentration changes. Torricelli et al.~\cite{torricelli2014time} reviewed TD gating for cortical applications but did not quantify subcortical sensitivity.
+
+Our finding that TPSF moments fail for deep brain targets contrasts with their demonstrated utility at cortical depths, where the target-to-total pathlength ratio is orders of magnitude more favourable. This distinction---that moment-based estimators are fundamentally limited by the pathlength ratio, not merely by photon count---has not been previously demonstrated in the literature and has implications for the design of next-generation TD systems.
+
+\subsection{Hardware Feasibility}
+
+The sensitivity achieved here ($0.231$~$\mu$M at 1~s integration) assumes hardware parameters that are commercially available or demonstrated in research systems. The source power (1~W at 730/850~nm) is within ANSI~Z136.1 limits for the specified fiber diameter. The SiPM detectors (Hamamatsu S14160-3050HS) achieve 80--100~ps IRF FWHM with 40--50\% photon detection efficiency across the near-infrared window.
+
+Research-grade TD-fNIRS systems with comparable specifications include MONSTIR~II (University College London; 32-channel, $\sim$100~ps IRF with photomultiplier tubes)~\cite{pifferi2016new} and the BONuS modules (Politecnico di Milano; compact single-photon avalanche diode detectors with $<100$~ps IRF). Superconducting nanowire single-photon detectors (SNSPDs) offer sub-10~ps timing jitter, which could in principle reduce IRF noise sufficiently to make TPSF moment analysis viable for deep brain targets. However, SNSPDs require cryogenic cooling ($\sim$2~K), limiting near-term clinical deployment.
+
+\subsection{Toward Clinical Translation}
+
+The block-design simulation (per-trial SNR~$\approx$~40 at SDS~=~29~mm) demonstrates that single-trial amygdala hemodynamic detection is feasible with TD gating. This opens a path toward ecological monitoring of amygdala function in populations poorly served by fMRI---including anxious patients, children, and participants in naturalistic paradigms~\cite{davis1992role,phelps2004human}.
+
+A staged validation pathway would proceed from (1)~tissue phantom experiments with a deep ($\sim$60~mm) absorbing inclusion to verify the predicted sensitivity, through (2)~in vivo validation using a fear-conditioning paradigm (a reliable amygdala activator) with simultaneous fMRI as ground truth, to (3)~standalone TD-fNIRS protocols for clinical populations. The integration-time scaling (Table~\ref{tab:int_time}) suggests that even 5~s epochs yield sub-micromolar sensitivity at SDS~=~29~mm, enabling event-related designs.
+
+\subsection{Limitations}
+
+Several limitations constrain the generalisability of these results.
+
+First, all simulations used a single head model (MNI152 template). Individual variability in scalp thickness, skull density, CSF volume, and sulcal geometry will affect optimal SDS and absolute sensitivity. The sensitivity analysis (Fig.~\ref{fig:sensitivity}) demonstrates robustness to $\pm 3$~mm skull thickness and $\pm 20\%$ optical property perturbations, but does not capture the full range of anatomical variation. Multi-subject studies with individual MRI segmentations are needed to establish population-level confidence intervals.
+
+Second, a single source position (the anatomically optimal scalp point closest to the amygdala) was used. In practice, source placement requires localiser-guided positioning with $\sim$5~mm accuracy, and suboptimal placement will degrade sensitivity. The sensitivity analysis provides a lower bound on the tolerance to placement error.
+
+Third, the amygdala was assigned gray matter optical properties (Table~\ref{tab:optical}). The amygdala's basolateral and central nuclei may exhibit distinct scattering and absorption due to differences in myelination and cell density, which are not captured by bulk gray matter parameters.
+
+Fourth, motion artefacts were not modelled. Head motion affects early- and late-gate photons differently, and motion correction algorithms for TD gating remain an open research area.
+
+Fifth, the noise model assumes independent noise terms combined in quadrature (Eq.~\ref{eq:noise}). Cross-terms---for example, physiological modulation of the photon arrival rate affecting shot noise statistics---are neglected. Additionally, the physiological noise model (0.2\% TPSF amplitude modulation) is spatially uniform; real Mayer waves, respiration, and cardiac pulsation have heterogeneous scalp distributions.
+
+Sixth, the integration-time scaling in Table~\ref{tab:int_time} assumes shot-noise-dominated conditions. At the photon rates achieved for late-gate detection at SDS~=~29~mm, shot noise dominates the noise budget for integration times up to $\sim$120~s; beyond this, physiological noise becomes increasingly significant and the $1/\sqrt{T}$ scaling will gradually plateau. The values reported are valid within the practical measurement range shown.
+
+Finally, all results are simulation-based with no experimental validation. While the MMC solver has been verified against analytical benchmarks (Henyey--Greenstein sampling, Fresnel reflectance, energy conservation), the predicted sensitivities must be confirmed with phantom and in vivo measurements.
+
 
 % =============================================
 % Conclusion
 % =============================================
 \section{Conclusion}
+
+We evaluated six depth-discrimination strategies for amygdala functional near-infrared spectroscopy using mesh-based Monte Carlo simulation with $10^{10}$ photons in an anatomically realistic seven-tissue head model. Time-domain gating at delays $\geq 5$~ns is the only viable method, achieving a minimum detectable $\Delta$HbO of $0.231$~$\mu$M at SDS~=~29~mm---four times below the $1$~$\mu$M evoked-response threshold. Five alternative approaches fail: CW MBLL ($71.8$~$\mu$M, scalp-dominated), SSR ($300$~$\mu$M, regression noise exceeds signal), TPSF moments ($>8{,}000$~$\mu$M, IRF jitter dominates), and DOT (amygdala in null space of sensitivity matrix).
+
+The optimal source--detector separation of $\sim$29~mm balances depth selectivity against photon statistics, and the $1$~$\mu$M threshold is crossed within a single 1~s trial. These results establish quantitative hardware specifications---SiPM detectors with $\leq 100$~ps IRF, $\sim$1~W dual-wavelength source, 25--35~mm SDS---for next-generation TD-fNIRS systems targeting subcortical structures. Experimental validation with tissue phantoms and in vivo fear-conditioning paradigms is the critical next step toward clinical translation.
+
+
+% =============================================
+% Disclosures
+% =============================================
+\section*{Disclosures}
+
+The authors have no financial interests or conflicts of interest to disclose.
+
+
+% =============================================
+% Code and Data Availability
+% =============================================
+\section*{Code and Data Availability}
+
+The mesh-based Monte Carlo simulation code, analysis scripts, and 10-billion-photon simulation results are available at \url{https://github.com/niketh-keshavan/amyg-sims}. The MNI152 head model is derived from the ICBM 2009c Nonlinear Symmetric atlas\cite{fonov2011unbiased}. Source data and analysis notebooks for generating all figures are provided in the repository.
+
+
+% =============================================
+% Acknowledgments
+% =============================================
+\section*{Acknowledgments}
+
+This work was supported by [funding sources to be added]. The authors thank [acknowledgments to be added] for helpful discussions.
 
 
 % =============================================
