@@ -1,18 +1,20 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
-title: "fNIRS Monte Carlo Simulation for Amygdala Oxygenation"
+title: "Time-domain fNIRS enables sub-micromolar amygdala detection: a mesh-based Monte Carlo simulation study"
 abstract: >
-  GPU-accelerated Monte Carlo photon transport simulation for evaluating 
-  the feasibility of measuring amygdala hemodynamic activity using 
-  functional near-infrared spectroscopy (fNIRS). Compares continuous-wave, 
-  time-domain, frequency-domain, and chirp-correlated measurement modalities 
-  in a realistic five-layer ellipsoidal adult head model.
+  GPU-accelerated mesh-based Monte Carlo photon transport simulation evaluating
+  six depth-discrimination strategies for amygdala hemodynamic imaging using
+  functional near-infrared spectroscopy (fNIRS). Uses a seven-tissue,
+  anatomically realistic head model derived from MNI152 with 347k tetrahedra
+  and 10 billion photon statistics. Demonstrates that time-domain gating at
+  delays >= 5 ns achieves sub-micromolar sensitivity (0.231 uM) for amygdala
+  detection.
 authors:
-  - family-names: "Your Name"
-    given-names: "Your Name"
+  - family-names: "Keshavan"
+    given-names: "Niketh"
     orcid: "https://orcid.org/0000-0000-0000-0000"
-repository-code: "https://github.com/yourusername/amyg-fnirs-mc"
+repository-code: "https://github.com/niketh-keshavan/amyg-sims"
 license: MIT
 keywords:
   - fNIRS
@@ -24,15 +26,12 @@ keywords:
   - GPU
   - time-domain
   - diffuse optics
+  - mesh-based Monte Carlo
+  - SiPM
 preferred-citation:
   type: article
-  title: "Feasibility of Time-Domain fNIRS for Amygdala Hemodynamic Monitoring: A Monte Carlo Simulation Study"
+  title: "Time-domain fNIRS enables sub-micromolar amygdala detection: a mesh-based Monte Carlo simulation study"
   authors:
-    - family-names: "Your Name"
-      given-names: "Your Name"
-  journal: "Journal Name"
+    - family-names: "Keshavan"
+      given-names: "Niketh"
   year: 2026
-  volume: 1
-  issue: 1
-  pages: "1-15"
-  doi: "10.xxxx/xxxxx"

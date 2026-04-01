@@ -28,7 +28,7 @@
 \title{\textbf{Time-domain fNIRS enables sub-micromolar amygdala detection:}\\[0.3em]
 \textbf{a mesh-based Monte Carlo simulation study}}
 
-\author{Author Names$^{1,2,*}$\\[0.5em]
+\author{Author Names$^{1,*}$\\[0.5em]
 \small $^1$Physics, University of California, Santa Barbara\\
 \small $^*$Corresponding author: niketh@ucsb.edu}
 
@@ -51,13 +51,13 @@ Functional near-infrared spectroscopy (fNIRS) of deep brain structures such as t
 % =============================================
 \section{Introduction}
 
-The amygdala is central to emotional processing and the pathophysiology of post-traumatic stress disorder and anxiety disorders. While functional MRI dominates amygdala imaging, it is expensive, immobile, and poorly suited for naturalistic paradigms or anxious populations. Functional near-infrared spectroscopy (fNIRS) offers a portable, motion-tolerant alternative for ecological measurements. However, the amygdala lies 60--70~mm beneath the scalp, among the deepest structures accessible to diffuse optics.
+The amygdala is central to emotional processing\cite{lindquist2012brain} and the pathophysiology of post-traumatic stress disorder and anxiety disorders. While functional MRI dominates amygdala imaging, it is expensive, immobile, and poorly suited for naturalistic paradigms or anxious populations. Functional near-infrared spectroscopy (fNIRS)\cite{scholkmann2014review} offers a portable, motion-tolerant alternative for ecological measurements. However, the amygdala lies 60--70~mm beneath the scalp, among the deepest structures accessible to diffuse optics.
 
 The fundamental barrier is contamination from extracerebral tissues. In continuous-wave (CW) fNIRS, photons traverse the scalp and skull thousands of times for each millimeter of deep-tissue path. Prior approaches to address this include short-separation regression (SSR), diffuse optical tomography (DOT), and time-domain (TD) gating of late-arriving photons.
 
 The efficacy of these methods for subcortical targets remains poorly quantified. SSR assumes homogeneous superficial signals, an approximation that breaks down when deep-detector scalp contributions are not collinear with shallow references. DOT reconstruction degrades exponentially with depth due to ill-posed inverse problems and superficial sensitivity dominance. TD methods require quantitative assessment under realistic instrument response functions (IRF), physiological noise, and finite photon budgets. Time-of-flight moments have been proposed as efficient estimators of tissue absorption, but their sensitivity to subcortical absorption has not been evaluated under realistic experimental constraints.
 
-Monte Carlo simulation provides the gold standard for photon transport in inhomogeneous geometries, solving the radiative transport equation without diffusion approximations\cite{wang1995mcml,fang2009mesh}. Previous deep-brain fNIRS simulations have been limited by simplified geometries, insufficient photon statistics, or idealized noise models\cite{strangman2014review,liebert2003monte,dehghani2009depth}.
+Monte Carlo simulation provides the gold standard for photon transport in inhomogeneous geometries, solving the radiative transport equation without diffusion approximations\cite{wang1995mcml,fang2009mesh,fang2010mesh}. Previous deep-brain fNIRS simulations have been limited by simplified geometries, insufficient photon statistics, or idealized noise models\cite{strangman2014review,liebert2003monte,dehghani2009depth}.
 
 Here we present a systematic evaluation using mesh-based Monte Carlo with $10^{10}$ photons---sufficient to resolve the extreme rarity of amygdala-traversing paths. We employ a seven-tissue anatomical model (scalp, skull, CSF, gray matter, white matter, amygdala, ventricles) derived from MNI152, incorporating shot noise, IRF jitter, physiological fluctuations, and residual scalp contamination. We compare six approaches: (1)~CW modified Beer--Lambert; (2)~SSR; (3)~TD gating; (4)~TD+SSR; (5)~TPSF variance; and (6)~DOT reconstruction.
 
@@ -192,7 +192,7 @@ Photon statistics convergence was verified by comparing results at $10^8$, $10^9
 
 \subsection{Optode Configuration}
 
-A single optical source (600~$\mu$m core FT8 fiber, 1~W continuous-wave, dual-wavelength 730~nm/850~nm) was placed at MNI coordinate $(24.4,\,-10.2,\,-71.0)$~mm, the closest scalp surface point to the right amygdala centroid, giving an anatomical minimum source--amygdala distance of 60.8~mm. Laser power was confirmed below the ANSI~Z136.1 maximum permissible skin exposure ($400$~mW/cm$^2$ for $>10$~s at $\lambda > 700$~nm) for this fiber diameter.
+A single optical source (600~$\mu$m core FT8 fiber, 1~W continuous-wave, dual-wavelength 730~nm/850~nm) was placed at MNI coordinate $(24.4,\,-10.2,\,-71.0)$~mm, the closest scalp surface point to the right amygdala centroid, giving an anatomical minimum source--amygdala distance of 60.8~mm. Laser power was confirmed below the ANSI~Z136.1 maximum permissible skin exposure\cite{ansi2014z136} ($400$~mW/cm$^2$ for $>10$~s at $\lambda > 700$~nm) for this fiber diameter.
 
 Twenty-eight fiber-coupled silicon photomultipliers (SiPMs; Hamamatsu S14160-3050HS, 3~$\times$~3~mm$^2$ active area) were arranged at source--detector separations (SDS) from 8~mm to 49~mm on the frontal--temporal scalp. The S14160-3050HS achieves photon detection efficiency (PDE) of 40--50\% across 730--850~nm with an instrument response function (IRF) FWHM of 80--100~ps, enabling sub-nanosecond time-domain gating. Detector positions were found by iterative binary search over scalp surface vertices, converging within $\pm 2$~mm of each target SDS. Four short-SDS detectors (8--12~mm) served as scalp reference channels for SSR. The 80~ps IRF jitter of the SiPMs---an order of magnitude better than legacy PMT systems---is the enabling technology for TPSF moment analysis, though as shown below, realistic IRF jitter still dominates the noise budget for deep-brain sensitivity.
 
@@ -340,7 +340,7 @@ The optimal detector was detector~29 at SDS~=~29~mm, achieving a minimum detecta
 
 \begin{table}[H]
 \centering
-\caption{Minimum detectable $\Delta$HbO at 850~nm (5~ns$+$ gate, 120~s integration).}
+\caption{Minimum detectable $\Delta$HbO at 850~nm (5~ns$+$ gate, 1~s integration).}
 \label{tab:td_results}
 \small
 \begin{tabular}{cccc}
@@ -495,7 +495,7 @@ The non-monotonic dependence of sensitivity on SDS (Table~\ref{tab:td_results}) 
 
 Each of the five unsuccessful methods fails for a distinct physical reason, and understanding these failure modes is as important as the positive TD result.
 
-\textbf{CW MBLL.} Without temporal discrimination, the CW measurement is a photon-weighted average dominated by superficial partial pathlengths that exceed the amygdala contribution by factors of $10^5$--$10^7$ (Fig.~\ref{fig:cw_vs_td}). No combination of wavelengths or detectors can overcome this contamination because the weighting is inherent to the diffusion process. Our CW result ($71.8$~$\mu$M minimum detectable $\Delta$HbO) is consistent with the scalp-dominance findings of Strangman et al.~\cite{strangman2014review} in the Colin27 model, which we extend here to quantitative sensitivity limits using $10^{10}$ photons and a realistic noise model.
+\textbf{CW MBLL.} Without temporal discrimination, the CW measurement is a photon-weighted average dominated by superficial partial pathlengths that exceed the amygdala contribution by factors of $10^5$--$10^7$ (Fig.~\ref{fig:contamination}). No combination of wavelengths or detectors can overcome this contamination because the weighting is inherent to the diffusion process. Our CW result ($71.8$~$\mu$M minimum detectable $\Delta$HbO) is consistent with the scalp-dominance findings of Strangman et al.~\cite{strangman2014review} in the Colin27 model, which we extend here to quantitative sensitivity limits using $10^{10}$ photons and a realistic noise model.
 
 \textbf{SSR.} Short-separation regression assumes that the short-SDS channel samples the same superficial hemodynamics as the scalp contribution to the long-SDS channel~\cite{saager2011direct}. At cortical depths ($\sim$15~mm), this spatial homogeneity approximation is reasonable. At subcortical depths, the long-SDS detector samples scalp tissue displaced $\sim$15--20~mm laterally from the short-SDS reference, and the two scalp regions have uncorrelated hemodynamic fluctuations. The regression residual variance $\sigma^2_\mathrm{long} + \hat{\beta}^2\sigma^2_\mathrm{short}$ therefore exceeds the uncorrected long-channel variance, explaining why SSR ($300$~$\mu$M) performs $4\times$ worse than CW alone.
 
@@ -545,7 +545,7 @@ Finally, all results are simulation-based with no experimental validation. While
 % =============================================
 \section{Conclusion}
 
-We evaluated six depth-discrimination strategies for amygdala functional near-infrared spectroscopy using mesh-based Monte Carlo simulation with $10^{10}$ photons in an anatomically realistic seven-tissue head model. Time-domain gating at delays $\geq 5$~ns is the only viable method, achieving a minimum detectable $\Delta$HbO of $0.231$~$\mu$M at SDS~=~29~mm---four times below the $1$~$\mu$M evoked-response threshold. Five alternative approaches fail: CW MBLL ($71.8$~$\mu$M, scalp-dominated), SSR ($300$~$\mu$M, regression noise exceeds signal), TPSF moments ($>8{,}000$~$\mu$M, IRF jitter dominates), and DOT (amygdala in null space of sensitivity matrix).
+We evaluated six depth-discrimination strategies for amygdala functional near-infrared spectroscopy using mesh-based Monte Carlo simulation with $10^{10}$ photons in an anatomically realistic seven-tissue head model. Time-domain gating at delays $\geq 5$~ns is the only viable method, achieving a minimum detectable $\Delta$HbO of $0.231$~$\mu$M at SDS~=~29~mm---four times below the $1$~$\mu$M evoked-response threshold. Five alternative approaches fail: CW MBLL ($71.8$~$\mu$M, scalp-dominated), SSR ($300$~$\mu$M, regression noise exceeds signal), TD+SSR ($300$~$\mu$M, regression noise negates gating benefit), TPSF moments ($>8{,}000$~$\mu$M, IRF jitter dominates), and DOT (amygdala in null space of sensitivity matrix).
 
 The optimal source--detector separation of $\sim$29~mm balances depth selectivity against photon statistics, and the $1$~$\mu$M threshold is crossed within a single 1~s trial. These results establish quantitative hardware specifications---SiPM detectors with $\leq 100$~ps IRF, $\sim$1~W dual-wavelength source, 25--35~mm SDS---for next-generation TD-fNIRS systems targeting subcortical structures. Experimental validation with tissue phantoms and in vivo fear-conditioning paradigms is the critical next step toward clinical translation.
 
